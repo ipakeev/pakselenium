@@ -1,5 +1,5 @@
 import time
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Dict, Union, Optional
 
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
@@ -129,6 +129,10 @@ class Browser(object):
             return [i.get_attribute(name).strip() for i in element]
         else:
             return element.get_attribute(name).strip()
+
+    def getDictOfElements(self, elements: List[WebElement]) -> Dict[str, WebElement]:
+        names = self.getText(elements)
+        return {name: elem for name, elem in zip(names, elements)}
 
     def clearForm(self, element: WebElement):
         element.clear()
