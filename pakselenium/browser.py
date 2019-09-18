@@ -18,25 +18,7 @@ from selenium.common.exceptions import ElementNotVisibleException
 from selenium.common.exceptions import InvalidElementStateException
 
 
-def sleepAfterGetPageDecorator(func):
-    def wrapper(self, *args, **kwargs):
-        res = func(self, *args, **kwargs)
-        time.sleep(config.waitAfterGetUrl)
-        return res
-
-    return wrapper
-
-
-def sleepAfterClickDecorator(func):
-    def wrapper(self, *args, **kwargs):
-        res = func(self, *args, **kwargs)
-        time.sleep(config.waitAfterClick)
-        return res
-
-    return wrapper
-
-
-def sleepAfterMoveCursorDecorator(func):
+def sleep(func):
     def wrapper(self, *args, **kwargs):
         res = func(self, *args, **kwargs)
         time.sleep(self.config.wait)
