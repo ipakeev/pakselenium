@@ -1,5 +1,5 @@
 import time
-from typing import List, Union
+from typing import List, Tuple, Union, Optional
 
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
@@ -18,13 +18,30 @@ from selenium.common.exceptions import ElementNotVisibleException
 from selenium.common.exceptions import InvalidElementStateException
 
 
-def sleep(func):
+def catchExceptions(func):
     def wrapper(self, *args, **kwargs):
-        res = func(self, *args, **kwargs)
-        time.sleep(self.config.wait)
+        while 1:
+            try:
+                res = func(self, *args, **kwargs)
+                break
+            except:
+                print(func, args, kwargs)
+                raise
         return res
 
     return wrapper
+
+
+def isReachedCondition(until: Optional[callable, Tuple[callable]]):
+    if until is None:
+        return True
+
+    if type(until) is tuple:
+        if all([i() for i in until]):
+            return True
+    else:
+        if until():
+            return True
 
 
 class Config(object):
@@ -52,7 +69,7 @@ class Browser(object):
     def initChrome(self, driver: str):
         self.config.browserName = self.config.chrome
         self.config.browserArgs = (driver,)
-        self.browser = webdriver.Chrome(driver)
+        self.browser = webdriver.Chrome(executable_path=driver)
         self.initAfterBrowser()
 
     def initFirefox(self, driver: str, binary: str):
@@ -67,10 +84,10 @@ class Browser(object):
         self.browser = webdriver.PhantomJS(executable_path=driver)
         self.initAfterBrowser()
 
-    @sleep
     def initAfterBrowser(self):
         self.wait = WebDriverWait(self.browser, self.config.timeout)
         self.actions = ActionChains(self.browser)
+        self.sleep()
 
     def newSession(self):
         assert self.config.browserName
@@ -82,6 +99,10 @@ class Browser(object):
             self.initPhantomJS(*self.config.browserArgs)
         else:
             raise StopIteration(self.config.browserName)
+
+    def sleep(self, sec: Optional[int] = None):
+        sec = sec or self.config.wait
+        time.sleep(sec or self.config.wait)
 
     def findElement(self, path: str) -> WebElement:
         return self.browser.find_element(self.selector, path)
@@ -95,39 +116,53 @@ class Browser(object):
     def findElementsFrom(self, element: WebElement, path: str) -> List[WebElement]:
         return element.find_elements(self.selector, path)
 
+    @catchExceptions
     def getText(self, element: Union[WebElement, List[WebElement]]) -> Union[str, list]:
         if type(element) is list:
             return [i.text.strip() for i in element]
         else:
             return element.text.strip()
 
+    @catchExceptions
     def getAttribute(self, element: Union[WebElement, List[WebElement]], name: str) -> Union[str, list]:
         if type(element) is list:
             return [i.get_attribute(name).strip() for i in element]
         else:
             return element.get_attribute(name).strip()
 
-    @sleep
     def clearForm(self, element: WebElement):
         element.clear()
+        self.sleep()
 
-    @sleep
     def fillForm(self, element: WebElement, value: str):
         element.send_keys(value)
+        self.sleep()
 
-    @sleep
-    def click(self, element: WebElement, wait=None, timeout=None):
-        element.click()
-
-    @sleep
     def moveCursor(self, element: WebElement):
         self.actions.reset_actions()
         self.actions.move_to_element(element)
         self.actions.perform()
+        self.sleep()
 
-    @sleep
+    def click(self, element: WebElement, until: Optional[callable, Tuple[callable]] = None):
+        element.click()
+        while 1:
+            if isReachedCondition(until):
+                break
+            print(f'>!> delay clicking "{self.getText(element)}" button')
+            self.sleep(5)
+
+    def go(self, url, until: Optional[callable, Tuple[callable]] = None):
+        self.config.url = url
+        while 1:
+            self.browser.get(url)
+            self.sleep()
+            if isReachedCondition(until):
+                break
+
     def refresh(self):
         self.browser.refresh()
+        self.sleep()
 
     def getCookies(self):
         return self.browser.get_cookies()
@@ -136,13 +171,8 @@ class Browser(object):
         for cookie in cookies:
             self.browser.add_cookie(cookie)
 
-    def isDisplayed(self, element: WebElement, wait=None):
+    def isDisplayed(self, element: WebElement):
         return element.is_displayed()
-
-    @sleep
-    def go(self, url, refresh=False, timeout=None):
-        self.config.url = url
-        self.browser.get(url)
 
     def addToDoOnNewSession(self, func, *args, **kwargs):
         pass
