@@ -175,7 +175,8 @@ class Browser(object):
         for cookie in cookies:
             self.browser.add_cookie(cookie)
 
-    def isDisplayed(self, element: WebElement):
+    @staticmethod
+    def isDisplayed(element: WebElement):
         return element.is_displayed()
 
     def addToDoOnNewSession(self, func, *args, **kwargs):
