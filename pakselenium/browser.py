@@ -58,7 +58,7 @@ class Browser(object):
     def initFirefox(self, driver: str, binary: str):
         self.config.browserName = self.config.firefox
         self.config.browserArgs = (driver, binary)
-        self.browser = webdriver.Firefox(firefox_binary=binary, executable_path=driver)
+        self.browser = webdriver.Firefox(firefox_binary=FirefoxBinary(binary), executable_path=driver)
         self.initAfterBrowser()
 
     def initPhantomJS(self, driver: str):
