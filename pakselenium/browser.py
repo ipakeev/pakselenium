@@ -1,7 +1,7 @@
 import sys
 import traceback
 import time
-from typing import List, Tuple, Dict, Callable, Union, Optional
+from typing import List, Tuple, Callable, Union, Optional
 
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
@@ -18,25 +18,6 @@ from selenium.common.exceptions import WebDriverException
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import ElementNotVisibleException
 from selenium.common.exceptions import InvalidElementStateException
-
-
-def catchExceptions(func):
-    def wrapper(self, *args, **kwargs):
-        while 1:
-            try:
-                res = func(self, *args, **kwargs)
-                break
-            except StaleElementReferenceException:
-                # when element is updating
-                exc_info = sys.exc_info()
-                traceback.print_exception(*exc_info)
-            except:
-                print(func, args, kwargs)
-                raise
-            time.sleep(1)
-        return res
-
-    return wrapper
 
 
 def isReachedCondition(until: Union[Callable, Tuple[Callable]]):
@@ -72,15 +53,36 @@ def EC_isVisible(element):
     return wrapper
 
 
-def cycle_text(element: WebElement):
-    while 1:
-        try:
-            return element.text.strip()
-        except StaleElementReferenceException:
-            # when element is updating
-            exc_info = sys.exc_info()
-            traceback.print_exception(*exc_info)
+def catchStaleElementReferenceException(func):
+    def wrapper(self, *args, **kwargs):
+        while 1:
+            try:
+                return func(self, *args, **kwargs)
+            except StaleElementReferenceException:
+                # when element is updating
+                exc_info = sys.exc_info()
+                traceback.print_exception(*exc_info)
+            except Exception as e:
+                print(func, args, kwargs)
+                raise e
             time.sleep(1)
+
+    return wrapper
+
+
+class PageElement(object):
+    element: WebElement
+    text: str
+
+    def __init__(self, element: WebElement):
+        self.element = element
+        self.text = self.element.text.strip()
+
+    def isDisplayed(self):
+        return self.element.is_displayed()
+
+    def getAttribute(self, name):
+        return self.element.get_attribute(name)
 
 
 class Config(object):
@@ -152,82 +154,63 @@ class Browser(object):
         except NoSuchElementException:
             return False
 
-    def findElement(self, path: str) -> WebElement:
+    @catchStaleElementReferenceException
+    def findElement(self, path: str) -> PageElement:
         self.config.element = path
         assert self.isOnPage(path)
         element = self.browser.find_element(self.selector, path)
-        self.config.element = element
-        assert element is not None
-        return element
+        return PageElement(element)
 
-    def findElements(self, path: str) -> List[WebElement]:
+    @catchStaleElementReferenceException
+    def findElements(self, path: str) -> List[PageElement]:
         self.config.element = path
         assert self.isOnPage(path)
-        elements = self.browser.find_elements(self.selector, path)
-        self.config.element = elements
-        assert elements is not None
-        return elements
+        es = self.browser.find_elements(self.selector, path)
+        pes = []
+        for element in es:
+            pes.append(PageElement(element))
+        return pes
 
-    def findElementFrom(self, element: WebElement, path: str) -> WebElement:
+    @catchStaleElementReferenceException
+    def findElementFrom(self, element: WebElement, path: str) -> PageElement:
         self.config.element = element, path
-        return element.find_element(self.selector, path)
+        element = element.find_element(self.selector, path)
+        return PageElement(element)
 
-    def findElementsFrom(self, element: WebElement, path: str) -> List[WebElement]:
+    @catchStaleElementReferenceException
+    def findElementsFrom(self, element: WebElement, path: str) -> List[PageElement]:
         self.config.element = element, path
-        return element.find_elements(self.selector, path)
+        es = element.find_elements(self.selector, path)
+        pes = []
+        for element in es:
+            pes.append(PageElement(element))
+        return pes
 
-    def getText(self, element: Union[WebElement, List[WebElement]]) -> Union[str, list]:
-        if type(element) is list:
-            texts = []
-            for i in element:
-                self.config.element = i
-                texts.append(cycle_text(i))
-            return texts
-        else:
-            self.config.element = element
-            return cycle_text(element)
-
-    def getAttribute(self, element: Union[WebElement, List[WebElement]], name: str) -> Union[str, list]:
-        if type(element) is list:
-            texts = []
-            for i in element:
-                self.config.element = i
-                texts.append(i.get_attribute(name).strip())
-            return texts
-        else:
-            self.config.element = element
-            return element.get_attribute(name).strip()
-
-    def getDictOfElements(self, elements: List[WebElement]) -> Dict[str, WebElement]:
-        names = self.getText(elements)
-        return {name: elem for name, elem in zip(names, elements)}
-
-    def clearForm(self, element: WebElement):
-        self.config.element = element
-        self.wait.until(EC_isVisible(element))
-        element.clear()
+    def clearForm(self, pe: PageElement):
+        self.config.element = pe
+        self.wait.until(EC_isVisible(pe.element))
+        pe.element.clear()
         self.sleep()
 
-    def fillForm(self, element: WebElement, value: str):
-        self.config.element = element
-        self.wait.until(EC_isVisible(element))
-        element.send_keys(value)
+    def fillForm(self, pe: PageElement, value: str):
+        self.config.element = pe
+        self.wait.until(EC_isVisible(pe.element))
+        pe.element.send_keys(value)
         self.sleep()
 
-    def moveCursor(self, element: WebElement):
-        self.config.element = element
-        self.wait.until(EC_isVisible(element))
+    def moveCursor(self, pe: PageElement):
+        self.config.element = pe
+        self.wait.until(EC_isVisible(pe.element))
         self.actions.reset_actions()
-        self.actions.move_to_element(element)
+        self.actions.move_to_element(pe.element)
         self.actions.perform()
         self.sleep()
 
-    def click(self, element: WebElement, until: Union[Callable, Tuple[Callable, ...]] = None,
+    def click(self, pe: PageElement, until: Union[Callable, Tuple[Callable, ...]] = None,
               empty: Callable = None, reload: Callable = None):
-        text = self.getText(element)
-        self.config.element = element
-        self.wait.until(EC_isVisible(element))
-        element.click()
+        self.config.element = pe
+        self.wait.until(EC_isVisible(pe.element))
+        pe.element.click()
         self.sleep()
         tt = time.time()
         while 1:
@@ -240,7 +223,7 @@ class Browser(object):
             if isReachedCondition(until):
                 return
             if time.time() - tt >= 20:
-                print('>!> delay clicking "{}" button'.format(text))
+                print('>!> delay clicking "{}" button'.format(pe.text))
                 self.browser.refresh()
                 self.sleep(5)
                 tt = time.time()
@@ -286,13 +269,3 @@ class Browser(object):
             if 'expiry' in cookie:
                 del cookie['expiry']
             self.browser.add_cookie(cookie)
-
-    @staticmethod
-    def isDisplayed(element: WebElement):
-        return element.is_displayed()
-
-    def addToDoOnNewSession(self, func, *args, **kwargs):
-        pass
-
-    def waitAvailable(self, waitAvailablePath, emptyPath=None, printer=True, timeout=None):
-        pass
