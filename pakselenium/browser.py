@@ -1,3 +1,5 @@
+import sys
+import traceback
 import time
 from typing import List, Tuple, Dict, Callable, Union, Optional
 
@@ -24,15 +26,20 @@ def catchExceptions(func):
             try:
                 res = func(self, *args, **kwargs)
                 break
+            except StaleElementReferenceException:
+                # when element is updating
+                exc_info = sys.exc_info()
+                traceback.print_exception(*exc_info)
             except:
                 print(func, args, kwargs)
                 raise
+            time.sleep(1)
         return res
 
     return wrapper
 
 
-def isReachedCondition(until: Optional[callable, Tuple[callable]]):
+def isReachedCondition(until: Union[Callable, Tuple[Callable]]):
     if until is None:
         return True
 
@@ -44,15 +51,34 @@ def isReachedCondition(until: Optional[callable, Tuple[callable]]):
             return True
 
 
+def EC_isVisible(element):
+    def wrapper(_):
+        return element.is_displayed()
+
+    return wrapper
+
+
+def cycle_text(element: WebElement):
+    while 1:
+        try:
+            return element.text.strip()
+        except StaleElementReferenceException:
+            # when element is updating
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+
+
 class Config(object):
     browserName: str
     browserArgs: tuple
-    timeout: int = 1
+    timeout: int = 10
     wait: int = 1
+    implicitWait: int = 5
     url: str = ''
     chrome: str = 'chrome'
     firefox: str = 'firefox'
     phantomJS: str = 'phantomJS'
+    element: WebElement
 
 
 class Browser(object):
@@ -62,9 +88,8 @@ class Browser(object):
     config: Config
     selector: str = By.CSS_SELECTOR
 
-    def __init__(self, timeout=10):
+    def __init__(self):
         self.config = Config()
-        self.config.timeout = timeout
 
     def initChrome(self, driver: str):
         self.config.browserName = self.config.chrome
@@ -85,6 +110,7 @@ class Browser(object):
         self.initAfterBrowser()
 
     def initAfterBrowser(self):
+        self.browser.implicitly_wait(self.config.implicitWait)
         self.wait = WebDriverWait(self.browser, self.config.timeout)
         self.actions = ActionChains(self.browser)
         self.sleep()
@@ -104,30 +130,53 @@ class Browser(object):
         sec = sec or self.config.wait
         time.sleep(sec or self.config.wait)
 
+    def isOnPage(self, path: str) -> bool:
+        return not EC.invisibility_of_element((self.selector, path))(self.browser)
+
     def findElement(self, path: str) -> WebElement:
-        return self.browser.find_element(self.selector, path)
+        self.config.element = path
+        assert self.isOnPage(path)
+        element = self.browser.find_element(self.selector, path)
+        self.config.element = element
+        assert element is not None
+        return element
 
     def findElements(self, path: str) -> List[WebElement]:
-        return self.browser.find_elements(self.selector, path)
+        self.config.element = path
+        assert self.isOnPage(path)
+        elements = self.browser.find_elements(self.selector, path)
+        self.config.element = elements
+        assert elements is not None
+        return elements
 
     def findElementFrom(self, element: WebElement, path: str) -> WebElement:
+        self.config.element = element, path
         return element.find_element(self.selector, path)
 
     def findElementsFrom(self, element: WebElement, path: str) -> List[WebElement]:
+        self.config.element = element, path
         return element.find_elements(self.selector, path)
 
-    @catchExceptions
     def getText(self, element: Union[WebElement, List[WebElement]]) -> Union[str, list]:
         if type(element) is list:
-            return [i.text.strip() for i in element]
+            texts = []
+            for i in element:
+                self.config.element = i
+                texts.append(cycle_text(i))
+            return texts
         else:
-            return element.text.strip()
+            self.config.element = element
+            return cycle_text(element)
 
-    @catchExceptions
     def getAttribute(self, element: Union[WebElement, List[WebElement]], name: str) -> Union[str, list]:
         if type(element) is list:
-            return [i.get_attribute(name).strip() for i in element]
+            texts = []
+            for i in element:
+                self.config.element = i
+                texts.append(i.get_attribute(name).strip())
+            return texts
         else:
+            self.config.element = element
             return element.get_attribute(name).strip()
 
     def getDictOfElements(self, elements: List[WebElement]) -> Dict[str, WebElement]:
@@ -135,44 +184,66 @@ class Browser(object):
         return {name: elem for name, elem in zip(names, elements)}
 
     def clearForm(self, element: WebElement):
+        self.config.element = element
+        self.wait.until(EC_isVisible(element))
         element.clear()
         self.sleep()
 
     def fillForm(self, element: WebElement, value: str):
+        self.config.element = element
+        self.wait.until(EC_isVisible(element))
         element.send_keys(value)
         self.sleep()
 
     def moveCursor(self, element: WebElement):
+        self.config.element = element
+        self.wait.until(EC_isVisible(element))
         self.actions.reset_actions()
         self.actions.move_to_element(element)
         self.actions.perform()
         self.sleep()
 
-    def click(self, element: WebElement, until: Optional[Callable, Tuple[Callable]] = None):
+    def click(self, element: WebElement, until: Union[Callable, Tuple[Callable, ...]] = None):
+        text = self.getText(element)
+        print('> clicking "{}" button'.format(text))
+        self.config.element = element
+        self.wait.until(EC_isVisible(element))
         element.click()
+        self.sleep(2)
         while 1:
             if isReachedCondition(until):
                 break
-            print(f'>!> delay clicking "{self.getText(element)}" button')
-            self.sleep(5)
+            print('>!> delay clicking "{}" button'.format(text))
+            self.sleep()
 
-    def go(self, url, until: Optional[Callable, Tuple[Callable]] = None):
+    def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None):
         self.config.url = url
         while 1:
             self.browser.get(url)
-            self.sleep()
+            try:
+                self.config.element = url
+                self.wait.until(EC.url_to_be(url))
+            except TimeoutException:
+                time.sleep(2)
+                continue
             if isReachedCondition(until):
                 break
 
     def refresh(self):
         self.browser.refresh()
-        self.sleep()
+        self.sleep(2)
+
+    @property
+    def currentUrl(self):
+        return self.browser.current_url
 
     def getCookies(self):
         return self.browser.get_cookies()
 
     def setCookies(self, cookies):
         for cookie in cookies:
+            if 'expiry' in cookie:
+                del cookie['expiry']
             self.browser.add_cookie(cookie)
 
     @staticmethod
