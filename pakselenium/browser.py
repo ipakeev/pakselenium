@@ -223,26 +223,27 @@ class Browser(object):
     def click(self, element: WebElement, until: Union[Callable, Tuple[Callable, ...]] = None,
               empty: Callable = None, reload: Callable = None):
         text = self.getText(element)
-        print('> clicking "{}" button'.format(text))
         self.config.element = element
         self.wait.until(EC_isVisible(element))
         element.click()
-        self.sleep(5)
+        self.sleep()
         tt = time.time()
         while 1:
             if isEmpty(empty):
                 return
             if isReload(reload):
                 self.browser.refresh()
+                self.sleep(5)
                 continue
             if isReachedCondition(until):
                 return
             if time.time() - tt >= 20:
                 print('>!> delay clicking "{}" button'.format(text))
                 self.browser.refresh()
+                self.sleep(5)
                 tt = time.time()
                 continue
-            self.sleep(5)
+            self.sleep(2)
 
     def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
            empty: Callable = None, reload: Callable = None):
@@ -259,6 +260,7 @@ class Browser(object):
                 return
             if isReload(reload):
                 self.browser.refresh()
+                self.sleep(5)
                 continue
             if isReachedCondition(until):
                 break
