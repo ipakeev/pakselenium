@@ -44,8 +44,10 @@ def isReachedCondition(until: Union[Callable, Tuple[Callable]]):
         return True
 
     if type(until) is tuple:
-        if all([i() for i in until]):
-            return True
+        for i in until:
+            if not i():
+                return False
+        return True
     else:
         if until():
             return True
