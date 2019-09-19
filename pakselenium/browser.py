@@ -1,5 +1,5 @@
 import time
-from typing import List, Tuple, Dict, Union, Optional
+from typing import List, Tuple, Dict, Callable, Union, Optional
 
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
@@ -148,7 +148,7 @@ class Browser(object):
         self.actions.perform()
         self.sleep()
 
-    def click(self, element: WebElement, until: Optional[callable, Tuple[callable]] = None):
+    def click(self, element: WebElement, until: Optional[Callable, Tuple[Callable]] = None):
         element.click()
         while 1:
             if isReachedCondition(until):
@@ -156,7 +156,7 @@ class Browser(object):
             print(f'>!> delay clicking "{self.getText(element)}" button')
             self.sleep(5)
 
-    def go(self, url, until: Optional[callable, Tuple[callable]] = None):
+    def go(self, url, until: Optional[Callable, Tuple[Callable]] = None):
         self.config.url = url
         while 1:
             self.browser.get(url)
