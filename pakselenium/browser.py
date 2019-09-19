@@ -51,6 +51,18 @@ def isReachedCondition(until: Union[Callable, Tuple[Callable]]):
             return True
 
 
+def isEmpty(empty: Callable):
+    if empty is None:
+        return False
+    return empty()
+
+
+def isReload(reload: Callable):
+    if reload is None:
+        return False
+    return reload()
+
+
 def EC_isVisible(element):
     def wrapper(_):
         return element.is_displayed()
@@ -66,14 +78,15 @@ def cycle_text(element: WebElement):
             # when element is updating
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
+            time.sleep(1)
 
 
 class Config(object):
     browserName: str
     browserArgs: tuple
-    timeout: int = 10
-    wait: int = 1
-    implicitWait: int = 5
+    timeoutWait: int = 10
+    sleep: int = 1
+    implicitWait: int = 0
     url: str = ''
     chrome: str = 'chrome'
     firefox: str = 'firefox'
@@ -111,7 +124,7 @@ class Browser(object):
 
     def initAfterBrowser(self):
         self.browser.implicitly_wait(self.config.implicitWait)
-        self.wait = WebDriverWait(self.browser, self.config.timeout)
+        self.wait = WebDriverWait(self.browser, self.config.timeoutWait)
         self.actions = ActionChains(self.browser)
         self.sleep()
 
@@ -127,11 +140,15 @@ class Browser(object):
             raise StopIteration(self.config.browserName)
 
     def sleep(self, sec: Optional[int] = None):
-        sec = sec or self.config.wait
-        time.sleep(sec or self.config.wait)
+        sec = sec or self.config.sleep
+        time.sleep(sec or self.config.sleep)
 
     def isOnPage(self, path: str) -> bool:
-        return not EC.invisibility_of_element((self.selector, path))(self.browser)
+        try:
+            self.browser.find_element(self.selector, path)
+            return True
+        except NoSuchElementException:
+            return False
 
     def findElement(self, path: str) -> WebElement:
         self.config.element = path
@@ -203,20 +220,32 @@ class Browser(object):
         self.actions.perform()
         self.sleep()
 
-    def click(self, element: WebElement, until: Union[Callable, Tuple[Callable, ...]] = None):
+    def click(self, element: WebElement, until: Union[Callable, Tuple[Callable, ...]] = None,
+              empty: Callable = None, reload: Callable = None):
         text = self.getText(element)
         print('> clicking "{}" button'.format(text))
         self.config.element = element
         self.wait.until(EC_isVisible(element))
         element.click()
-        self.sleep(2)
+        self.sleep(5)
+        tt = time.time()
         while 1:
+            if isEmpty(empty):
+                return
+            if isReload(reload):
+                self.browser.refresh()
+                continue
             if isReachedCondition(until):
-                break
-            print('>!> delay clicking "{}" button'.format(text))
-            self.sleep()
+                return
+            if time.time() - tt >= 20:
+                print('>!> delay clicking "{}" button'.format(text))
+                self.browser.refresh()
+                tt = time.time()
+                continue
+            self.sleep(5)
 
-    def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None):
+    def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
+           empty: Callable = None, reload: Callable = None):
         self.config.url = url
         while 1:
             self.browser.get(url)
@@ -224,14 +253,22 @@ class Browser(object):
                 self.config.element = url
                 self.wait.until(EC.url_to_be(url))
             except TimeoutException:
-                time.sleep(2)
+                time.sleep(5)
+                continue
+            if isEmpty(empty):
+                return
+            if isReload(reload):
+                self.browser.refresh()
                 continue
             if isReachedCondition(until):
                 break
 
-    def refresh(self):
-        self.browser.refresh()
-        self.sleep(2)
+    def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
+        while 1:
+            self.browser.refresh()
+            time.sleep(5)
+            if isReachedCondition(until):
+                break
 
     @property
     def currentUrl(self):
