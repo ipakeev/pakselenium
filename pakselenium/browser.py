@@ -60,8 +60,9 @@ def catchStaleElementReferenceException(func):
                 return func(self, *args, **kwargs)
             except StaleElementReferenceException:
                 # when element is updating
-                exc_info = sys.exc_info()
-                traceback.print_exception(*exc_info)
+                # exc_info = sys.exc_info()
+                # traceback.print_exception(*exc_info)
+                pass
             except Exception as e:
                 print(func, args, kwargs)
                 raise e
@@ -95,7 +96,7 @@ class Config(object):
     chrome: str = 'chrome'
     firefox: str = 'firefox'
     phantomJS: str = 'phantomJS'
-    element: WebElement
+    element: PageElement
 
 
 class Browser(object):
@@ -172,15 +173,15 @@ class Browser(object):
         return pes
 
     @catchStaleElementReferenceException
-    def findElementFrom(self, element: WebElement, path: str) -> PageElement:
-        self.config.element = element, path
-        element = element.find_element(self.selector, path)
+    def findElementFrom(self, pe: PageElement, path: str) -> PageElement:
+        self.config.element = pe, path
+        element = pe.element.find_element(self.selector, path)
         return PageElement(element)
 
     @catchStaleElementReferenceException
-    def findElementsFrom(self, element: WebElement, path: str) -> List[PageElement]:
-        self.config.element = element, path
-        es = element.find_elements(self.selector, path)
+    def findElementsFrom(self, pe: PageElement, path: str) -> List[PageElement]:
+        self.config.element = pe, path
+        es = pe.element.find_elements(self.selector, path)
         pes = []
         for element in es:
             pes.append(PageElement(element))
