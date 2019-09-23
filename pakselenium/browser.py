@@ -1,5 +1,3 @@
-import sys
-import traceback
 import time
 from typing import List, Tuple, Callable, Union, Optional
 
@@ -12,12 +10,9 @@ from selenium.webdriver.remote.webelement import WebElement
 import selenium.webdriver.support.expected_conditions as EC
 
 from selenium.common.exceptions import NoSuchElementException
-from http.client import CannotSendRequest
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import WebDriverException
 from selenium.common.exceptions import StaleElementReferenceException
-from selenium.common.exceptions import ElementNotVisibleException
-from selenium.common.exceptions import InvalidElementStateException
 
 
 def isReachedCondition(until: Union[Callable, Tuple[Callable]]):
@@ -71,6 +66,38 @@ def catchStaleElementReferenceException(func):
     return wrapper
 
 
+def catchWebDriverException(func):
+    def wrapper(self, *args, **kwargs):
+        while 1:
+            try:
+                return func(self, *args, **kwargs)
+            except WebDriverException:
+                # when browser is closed
+                self.newSession()
+            except Exception as e:
+                print(func, args, kwargs)
+                raise e
+            time.sleep(1)
+
+    return wrapper
+
+
+def catchTimeoutException(func):
+    def wrapper(self, *args, **kwargs):
+        while 1:
+            try:
+                return func(self, *args, **kwargs)
+            except TimeoutException:
+                # when slow loading elements
+                pass
+            except Exception as e:
+                print(func, args, kwargs)
+                raise e
+            time.sleep(5)
+
+    return wrapper
+
+
 class PageElement(object):
     element: WebElement
     text: str
@@ -118,7 +145,7 @@ class Browser(object):
     def initFirefox(self, driver: str, binary: str):
         self.config.browserName = self.config.firefox
         self.config.browserArgs = (driver, binary)
-        self.browser = webdriver.Firefox(firefox_binary=FirefoxBinary(binary), executable_path=driver)
+        self.browser = webdriver.Firefox(executable_path=driver, firefox_binary=FirefoxBinary(binary))
         self.initAfterBrowser()
 
     def initPhantomJS(self, driver: str):
@@ -144,10 +171,14 @@ class Browser(object):
         else:
             raise StopIteration(self.config.browserName)
 
+    def close(self):
+        self.browser.close()
+
     def sleep(self, sec: Optional[int] = None):
         sec = sec or self.config.sleep
         time.sleep(sec or self.config.sleep)
 
+    @catchWebDriverException
     def isOnPage(self, path: str) -> bool:
         try:
             self.browser.find_element(self.selector, path)
@@ -155,6 +186,7 @@ class Browser(object):
         except NoSuchElementException:
             return False
 
+    @catchWebDriverException
     @catchStaleElementReferenceException
     def findElement(self, path: str) -> PageElement:
         self.config.element = path
@@ -162,6 +194,7 @@ class Browser(object):
         element = self.browser.find_element(self.selector, path)
         return PageElement(element)
 
+    @catchWebDriverException
     @catchStaleElementReferenceException
     def findElements(self, path: str) -> List[PageElement]:
         self.config.element = path
@@ -231,17 +264,15 @@ class Browser(object):
                 continue
             self.sleep(2)
 
+    @catchWebDriverException
+    @catchTimeoutException
     def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
            empty: Callable = None, reload: Callable = None):
         self.config.url = url
         while 1:
             self.browser.get(url)
-            try:
-                self.config.element = url
-                self.wait.until(EC.url_to_be(url))
-            except TimeoutException:
-                time.sleep(5)
-                continue
+            self.wait.until(EC.url_to_be(url))
+
             if isEmpty(empty):
                 return
             if isReload(reload):
@@ -251,6 +282,7 @@ class Browser(object):
             if isReachedCondition(until):
                 break
 
+    @catchWebDriverException
     def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
         while 1:
             self.browser.refresh()
