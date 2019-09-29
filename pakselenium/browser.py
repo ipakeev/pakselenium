@@ -7,95 +7,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.remote.webelement import WebElement
-import selenium.webdriver.support.expected_conditions as EC
 
 from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import TimeoutException
-from selenium.common.exceptions import WebDriverException
-from selenium.common.exceptions import StaleElementReferenceException
 
-
-def isReachedCondition(until: Union[Callable, Tuple[Callable]]):
-    if until is None:
-        return True
-
-    if type(until) is tuple:
-        for i in until:
-            if not i():
-                return False
-        return True
-    else:
-        if until():
-            return True
-
-
-def isEmpty(empty: Callable):
-    if empty is None:
-        return False
-    return empty()
-
-
-def isReload(reload: Callable):
-    if reload is None:
-        return False
-    return reload()
-
-
-def EC_isVisible(element):
-    def wrapper(_):
-        return element.is_displayed()
-
-    return wrapper
-
-
-def catchStaleElementReferenceException(func):
-    def wrapper(self, *args, **kwargs):
-        while 1:
-            try:
-                return func(self, *args, **kwargs)
-            except StaleElementReferenceException:
-                # when element is updating
-                # exc_info = sys.exc_info()
-                # traceback.print_exception(*exc_info)
-                pass
-            except Exception as e:
-                print(func, args, kwargs)
-                raise e
-            time.sleep(1)
-
-    return wrapper
-
-
-def catchWebDriverException(func):
-    def wrapper(self, *args, **kwargs):
-        while 1:
-            try:
-                return func(self, *args, **kwargs)
-            except WebDriverException:
-                # when browser is closed
-                self.newSession()
-            except Exception as e:
-                print(func, args, kwargs)
-                raise e
-            time.sleep(1)
-
-    return wrapper
-
-
-def catchTimeoutException(func):
-    def wrapper(self, *args, **kwargs):
-        while 1:
-            try:
-                return func(self, *args, **kwargs)
-            except TimeoutException:
-                # when slow loading elements
-                pass
-            except Exception as e:
-                print(func, args, kwargs)
-                raise e
-            time.sleep(5)
-
-    return wrapper
+from .utils import callable_conditions as CC
+from .utils import expected_conditions as EC
+from .utils import catch
 
 
 class PageElement(object):
@@ -178,7 +95,6 @@ class Browser(object):
         sec = sec or self.config.sleep
         time.sleep(sec or self.config.sleep)
 
-    @catchWebDriverException
     def isOnPage(self, path: str) -> bool:
         try:
             self.browser.find_element(self.selector, path)
@@ -186,16 +102,14 @@ class Browser(object):
         except NoSuchElementException:
             return False
 
-    @catchWebDriverException
-    @catchStaleElementReferenceException
+    @catch.staleElementReferenceException
     def findElement(self, path: str) -> PageElement:
         self.config.element = path
         assert self.isOnPage(path)
         element = self.browser.find_element(self.selector, path)
         return PageElement(element)
 
-    @catchWebDriverException
-    @catchStaleElementReferenceException
+    @catch.staleElementReferenceException
     def findElements(self, path: str) -> List[PageElement]:
         self.config.element = path
         assert self.isOnPage(path)
@@ -205,13 +119,13 @@ class Browser(object):
             pes.append(PageElement(element))
         return pes
 
-    @catchStaleElementReferenceException
+    @catch.staleElementReferenceException
     def findElementFrom(self, pe: PageElement, path: str) -> PageElement:
         self.config.element = pe, path
         element = pe.element.find_element(self.selector, path)
         return PageElement(element)
 
-    @catchStaleElementReferenceException
+    @catch.staleElementReferenceException
     def findElementsFrom(self, pe: PageElement, path: str) -> List[PageElement]:
         self.config.element = pe, path
         es = pe.element.find_elements(self.selector, path)
@@ -222,19 +136,19 @@ class Browser(object):
 
     def clearForm(self, pe: PageElement):
         self.config.element = pe
-        self.wait.until(EC_isVisible(pe.element))
+        self.wait.until(EC.isVisible(pe.element))
         pe.element.clear()
         self.sleep()
 
     def fillForm(self, pe: PageElement, value: str):
         self.config.element = pe
-        self.wait.until(EC_isVisible(pe.element))
+        self.wait.until(EC.isVisible(pe.element))
         pe.element.send_keys(value)
         self.sleep()
 
     def moveCursor(self, pe: PageElement):
         self.config.element = pe
-        self.wait.until(EC_isVisible(pe.element))
+        self.wait.until(EC.isVisible(pe.element))
         self.actions.reset_actions()
         self.actions.move_to_element(pe.element)
         self.actions.perform()
@@ -243,18 +157,18 @@ class Browser(object):
     def click(self, pe: PageElement, until: Union[Callable, Tuple[Callable, ...]] = None,
               empty: Callable = None, reload: Callable = None):
         self.config.element = pe
-        self.wait.until(EC_isVisible(pe.element))
+        self.wait.until(EC.isVisible(pe.element))
         pe.element.click()
         self.sleep()
         tt = time.time()
         while 1:
-            if isEmpty(empty):
+            if CC.isEmpty(empty):
                 return
-            if isReload(reload):
+            if CC.isReload(reload):
                 self.browser.refresh()
                 self.sleep(5)
                 continue
-            if isReachedCondition(until):
+            if CC.isReached(until):
                 return
             if time.time() - tt >= 20:
                 print('>!> delay clicking "{}" button'.format(pe.text))
@@ -264,8 +178,7 @@ class Browser(object):
                 continue
             self.sleep(2)
 
-    @catchWebDriverException
-    @catchTimeoutException
+    @catch.timeoutException
     def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
            empty: Callable = None, reload: Callable = None):
         self.config.url = url
@@ -273,21 +186,20 @@ class Browser(object):
             self.browser.get(url)
             self.wait.until(EC.url_to_be(url))
 
-            if isEmpty(empty):
+            if CC.isEmpty(empty):
                 return
-            if isReload(reload):
+            if CC.isReload(reload):
                 self.browser.refresh()
                 self.sleep(5)
                 continue
-            if isReachedCondition(until):
+            if CC.isReached(until):
                 break
 
-    @catchWebDriverException
     def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
         while 1:
             self.browser.refresh()
             time.sleep(5)
-            if isReachedCondition(until):
+            if CC.isReached(until):
                 break
 
     @property
