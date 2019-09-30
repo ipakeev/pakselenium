@@ -198,7 +198,7 @@ class Browser(object):
     def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
         while 1:
             self.browser.refresh()
-            time.sleep(5)
+            self.sleep(5)
             if CC.isReached(until):
                 break
 
