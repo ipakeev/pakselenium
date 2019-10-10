@@ -184,7 +184,7 @@ class Browser(object):
             self.sleep()
             self.wait.until(EC.url_to_be(url))
 
-            if not self.isReachedPage(until, empty, reload):
+            if self.isReachedPage(until, empty, reload):
                 break
             else:
                 print('>!> delay getting "{}"'.format(url))
