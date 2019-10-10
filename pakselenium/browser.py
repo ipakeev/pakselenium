@@ -146,7 +146,7 @@ class Browser(object):
         self.actions.perform()
         self.sleep()
 
-    def isReachedPage(self, until: Union[Callable, Tuple[Callable, ...]], empty: Callable, reload: Callable):
+    def isReachedPage(self, until: Union[Callable, Tuple[Callable, ...]], empty: Callable, reload: Callable) -> bool:
         tt = time.time()
         while 1:
             if CC.isEmpty(empty):
@@ -157,7 +157,7 @@ class Browser(object):
                 continue
             if CC.isReached(until):
                 return True
-            if time.time() - tt >= 20:
+            if time.time() - tt >= self.config.timeoutWait:
                 return False
             self.sleep(2)
 
@@ -168,12 +168,12 @@ class Browser(object):
         self.sleep()
 
         while 1:
-            if not self.isReachedPage(until, empty, reload):
+            if self.isReachedPage(until, empty, reload):
+                break
+            else:
                 print('>!> delay clicking "{}" button'.format(pe.text))
                 self.browser.refresh()
                 self.sleep(5)
-            else:
-                break
 
     @catch.timeoutException
     def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
@@ -185,9 +185,9 @@ class Browser(object):
             self.wait.until(EC.url_to_be(url))
 
             if not self.isReachedPage(until, empty, reload):
-                print('>!> delay getting "{}"'.format(url))
-            else:
                 break
+            else:
+                print('>!> delay getting "{}"'.format(url))
 
     def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
         while 1:
@@ -197,10 +197,10 @@ class Browser(object):
                 break
 
     @property
-    def currentUrl(self):
+    def currentUrl(self) -> str:
         return self.browser.current_url
 
-    def getCookies(self):
+    def getCookies(self) -> dict:
         return self.browser.get_cookies()
 
     def setCookies(self, cookies):
