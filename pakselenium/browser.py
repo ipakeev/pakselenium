@@ -40,7 +40,6 @@ class Config(object):
     chrome: str = 'chrome'
     firefox: str = 'firefox'
     phantomJS: str = 'phantomJS'
-    element: PageElement
 
 
 class Browser(object):
@@ -104,14 +103,12 @@ class Browser(object):
 
     @catch.staleElementReferenceException
     def findElement(self, path: str) -> PageElement:
-        self.config.element = path
         assert self.isOnPage(path)
         element = self.browser.find_element(self.selector, path)
         return PageElement(element)
 
     @catch.staleElementReferenceException
     def findElements(self, path: str) -> List[PageElement]:
-        self.config.element = path
         assert self.isOnPage(path)
         es = self.browser.find_elements(self.selector, path)
         pes = []
@@ -121,13 +118,11 @@ class Browser(object):
 
     @catch.staleElementReferenceException
     def findElementFrom(self, pe: PageElement, path: str) -> PageElement:
-        self.config.element = pe, path
         element = pe.element.find_element(self.selector, path)
         return PageElement(element)
 
     @catch.staleElementReferenceException
     def findElementsFrom(self, pe: PageElement, path: str) -> List[PageElement]:
-        self.config.element = pe, path
         es = pe.element.find_elements(self.selector, path)
         pes = []
         for element in es:
@@ -135,48 +130,50 @@ class Browser(object):
         return pes
 
     def clearForm(self, pe: PageElement):
-        self.config.element = pe
         self.wait.until(EC.isVisible(pe.element))
         pe.element.clear()
         self.sleep()
 
     def fillForm(self, pe: PageElement, value: str):
-        self.config.element = pe
         self.wait.until(EC.isVisible(pe.element))
         pe.element.send_keys(value)
         self.sleep()
 
     def moveCursor(self, pe: PageElement):
-        self.config.element = pe
         self.wait.until(EC.isVisible(pe.element))
         self.actions.reset_actions()
         self.actions.move_to_element(pe.element)
         self.actions.perform()
         self.sleep()
 
-    def click(self, pe: PageElement, until: Union[Callable, Tuple[Callable, ...]] = None,
-              empty: Callable = None, reload: Callable = None):
-        self.config.element = pe
-        self.wait.until(EC.isVisible(pe.element))
-        pe.element.click()
-        self.sleep()
+    def isReachedPage(self, until: Union[Callable, Tuple[Callable, ...]], empty: Callable, reload: Callable):
         tt = time.time()
         while 1:
             if CC.isEmpty(empty):
-                return
+                return True
             if CC.isReload(reload):
                 self.browser.refresh()
-                self.sleep(5)
+                self.sleep(2)
                 continue
             if CC.isReached(until):
-                return
+                return True
             if time.time() - tt >= 20:
+                return False
+            self.sleep(2)
+
+    def click(self, pe: PageElement, until: Union[Callable, Tuple[Callable, ...]] = None,
+              empty: Callable = None, reload: Callable = None):
+        self.wait.until(EC.isVisible(pe.element))
+        pe.element.click()
+        self.sleep()
+
+        while 1:
+            if not self.isReachedPage(until, empty, reload):
                 print('>!> delay clicking "{}" button'.format(pe.text))
                 self.browser.refresh()
                 self.sleep(5)
-                tt = time.time()
-                continue
-            self.sleep(2)
+            else:
+                break
 
     @catch.timeoutException
     def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
@@ -184,15 +181,12 @@ class Browser(object):
         self.config.url = url
         while 1:
             self.browser.get(url)
+            self.sleep()
             self.wait.until(EC.url_to_be(url))
 
-            if CC.isEmpty(empty):
-                return
-            if CC.isReload(reload):
-                self.browser.refresh()
-                self.sleep(5)
-                continue
-            if CC.isReached(until):
+            if not self.isReachedPage(until, empty, reload):
+                print('>!> delay getting "{}"'.format(url))
+            else:
                 break
 
     def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
