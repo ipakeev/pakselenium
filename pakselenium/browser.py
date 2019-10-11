@@ -1,5 +1,5 @@
 import time
-from typing import List, Tuple, Callable, Union, Optional
+from typing import List, Tuple, Callable, Union
 
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
@@ -34,7 +34,6 @@ class Config(object):
     browserName: str
     browserArgs: tuple
     timeoutWait: int = 10
-    sleep: int = 1
     implicitWait: int = 0
     url: str = ''
     chrome: str = 'chrome'
@@ -74,10 +73,11 @@ class Browser(object):
         self.browser.implicitly_wait(self.config.implicitWait)
         self.wait = WebDriverWait(self.browser, self.config.timeoutWait)
         self.actions = ActionChains(self.browser)
-        self.sleep()
+        time.sleep(1.0)
 
     def newSession(self):
         assert self.config.browserName
+        self.close()
         if self.config.browserName == self.config.chrome:
             self.initChrome(*self.config.browserArgs)
         elif self.config.browserName == self.config.firefox:
@@ -89,10 +89,6 @@ class Browser(object):
 
     def close(self):
         self.browser.close()
-
-    def sleep(self, sec: Optional[int] = None):
-        sec = sec or self.config.sleep
-        time.sleep(sec or self.config.sleep)
 
     def isOnPage(self, path: str) -> bool:
         try:
@@ -132,19 +128,19 @@ class Browser(object):
     def clearForm(self, pe: PageElement):
         self.wait.until(EC.isVisible(pe.element))
         pe.element.clear()
-        self.sleep()
+        time.sleep(1.0)
 
     def fillForm(self, pe: PageElement, value: str):
         self.wait.until(EC.isVisible(pe.element))
         pe.element.send_keys(value)
-        self.sleep()
+        time.sleep(1.0)
 
     def moveCursor(self, pe: PageElement):
         self.wait.until(EC.isVisible(pe.element))
         self.actions.reset_actions()
         self.actions.move_to_element(pe.element)
         self.actions.perform()
-        self.sleep()
+        time.sleep(1.0)
 
     def isReachedPage(self, until: Union[Callable, Tuple[Callable, ...]], empty: Callable, reload: Callable) -> bool:
         tt = time.time()
@@ -153,19 +149,19 @@ class Browser(object):
                 return True
             if CC.isReload(reload):
                 self.browser.refresh()
-                self.sleep(2)
+                time.sleep(2.0)
                 continue
             if CC.isReached(until):
                 return True
             if time.time() - tt >= self.config.timeoutWait:
                 return False
-            self.sleep(2)
+            time.sleep(2.0)
 
     def click(self, pe: PageElement, until: Union[Callable, Tuple[Callable, ...]] = None,
               empty: Callable = None, reload: Callable = None):
         self.wait.until(EC.isVisible(pe.element))
         pe.element.click()
-        self.sleep()
+        time.sleep(1.0)
 
         while 1:
             if self.isReachedPage(until, empty, reload):
@@ -173,7 +169,7 @@ class Browser(object):
             else:
                 print('>!> delay clicking "{}" button'.format(pe.text))
                 self.browser.refresh()
-                self.sleep(5)
+                time.sleep(3.0)
 
     @catch.timeoutException
     def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
@@ -181,18 +177,20 @@ class Browser(object):
         self.config.url = url
         while 1:
             self.browser.get(url)
-            self.sleep()
+            time.sleep(1.0)
             self.wait.until(EC.url_to_be(url))
 
             if self.isReachedPage(until, empty, reload):
                 break
             else:
                 print('>!> delay getting "{}"'.format(url))
+                self.browser.refresh()
+                time.sleep(3.0)
 
     def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
         while 1:
             self.browser.refresh()
-            self.sleep(5)
+            time.sleep(5.0)
             if CC.isReached(until):
                 break
 
