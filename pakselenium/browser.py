@@ -9,6 +9,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.remote.webelement import WebElement
 
 from selenium.common.exceptions import NoSuchElementException
+from urllib3.exceptions import MaxRetryError
 
 from .utils import callable_conditions as CC
 from .utils import expected_conditions as EC
@@ -88,7 +89,10 @@ class Browser(object):
             raise StopIteration(self.config.browserName)
 
     def close(self):
-        self.browser.close()
+        try:
+            self.browser.close()
+        except MaxRetryError:
+            pass
 
     def isOnPage(self, path: str) -> bool:
         try:
