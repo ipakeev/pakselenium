@@ -182,7 +182,7 @@ class Browser(object):
         while 1:
             self.browser.get(url)
             time.sleep(1.0)
-            self.wait.until(EC.url_to_be(url))
+            self.wait.until(EC.url_contains(url))
 
             if self.isReachedPage(until, empty, reload):
                 break

@@ -1,9 +1,10 @@
 from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.support.expected_conditions import url_to_be
+from selenium.webdriver.support.expected_conditions import url_contains
 
 
-def isVisible(element: WebElement):
-    def wrapper(_):
-        return element.is_displayed()
+class isVisible(object):
+    def __init__(self, element: WebElement):
+        self.element = element
 
-    return wrapper
+    def __call__(self, driver):
+        return self.element.is_displayed()
