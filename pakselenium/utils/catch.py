@@ -14,7 +14,7 @@ def staleElementReferenceException(func):
                 # traceback.print_exception(*exc_info)
                 pass
             except Exception as e:
-                print(func, args, kwargs)
+                print('pakselenium staleElementReferenceException:', func, args, kwargs)
                 raise e
             time.sleep(1)
 
@@ -30,7 +30,7 @@ def timeoutException(func):
                 # when slow loading elements
                 pass
             except Exception as e:
-                print(func, args, kwargs)
+                print('pakselenium timeoutException:', func, args, kwargs)
                 raise e
             time.sleep(5)
 
