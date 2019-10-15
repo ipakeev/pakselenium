@@ -132,12 +132,12 @@ class Browser(object):
     def clearForm(self, pe: PageElement):
         self.wait.until(EC.isVisible(pe.element))
         pe.element.clear()
-        time.sleep(1.0)
+        time.sleep(0.5)
 
     def fillForm(self, pe: PageElement, value: str):
         self.wait.until(EC.isVisible(pe.element))
         pe.element.send_keys(value)
-        time.sleep(1.0)
+        time.sleep(0.5)
 
     def moveCursor(self, pe: PageElement):
         self.wait.until(EC.isVisible(pe.element))
@@ -153,27 +153,25 @@ class Browser(object):
                 return True
             if CC.isReload(reload):
                 self.browser.refresh()
-                time.sleep(2.0)
                 continue
             if CC.isReached(until):
                 return True
             if time.time() - tt >= self.config.timeoutWait:
                 return False
-            time.sleep(2.0)
+            time.sleep(0.5)
 
     def click(self, pe: PageElement, until: Union[Callable, Tuple[Callable, ...]] = None,
               empty: Callable = None, reload: Callable = None):
         self.wait.until(EC.isVisible(pe.element))
         pe.element.click()
-        time.sleep(1.0)
+        time.sleep(0.5)
 
         while 1:
             if self.isReachedPage(until, empty, reload):
                 break
             else:
-                print('>!> delay clicking "{}" button'.format(pe.text))
+                # print('>!> delay clicking "{}" button'.format(pe.text))
                 self.browser.refresh()
-                time.sleep(3.0)
 
     @catch.timeoutException
     def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
@@ -187,9 +185,8 @@ class Browser(object):
             if self.isReachedPage(until, empty, reload):
                 break
             else:
-                print('>!> delay getting "{}"'.format(url))
+                # print('>!> delay getting "{}"'.format(url))
                 self.browser.refresh()
-                time.sleep(3.0)
 
     def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
         while 1:
