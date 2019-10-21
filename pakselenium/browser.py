@@ -67,7 +67,7 @@ class Browser(object):
             'headless': headless,
             'args': args,
         }
-        self.browser = webdriver.Chrome(executable_path=driver, chrome_options=options)
+        self.browser = webdriver.Chrome(executable_path=driver, options=options)
         self.initAfterBrowser()
 
     def initFirefox(self, driver: str, binary: str):
