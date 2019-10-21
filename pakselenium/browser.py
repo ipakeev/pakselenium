@@ -34,7 +34,7 @@ class PageElement(object):
 
 class Config(object):
     browserName: str
-    browserArgs: tuple
+    browserKwargs: dict
     timeoutWait: int = 10
     implicitWait: int = 0
     url: str = ''
@@ -53,21 +53,29 @@ class Browser(object):
     def __init__(self):
         self.config = Config()
 
-    def initChrome(self, driver: str):
+    def initChrome(self, driver: str, options=None):
         self.config.browserName = self.config.chrome
-        self.config.browserArgs = (driver,)
-        self.browser = webdriver.Chrome(executable_path=driver)
+        self.config.browserKwargs = {
+            'driver': driver,
+            'options': options,
+        }
+        self.browser = webdriver.Chrome(executable_path=driver, options=options)
         self.initAfterBrowser()
 
     def initFirefox(self, driver: str, binary: str):
         self.config.browserName = self.config.firefox
-        self.config.browserArgs = (driver, binary)
+        self.config.browserKwargs = {
+            'driver': driver,
+            'binary': binary,
+        }
         self.browser = webdriver.Firefox(executable_path=driver, firefox_binary=FirefoxBinary(binary))
         self.initAfterBrowser()
 
     def initPhantomJS(self, driver: str):
         self.config.browserName = self.config.phantomJS
-        self.config.browserArgs = (driver,)
+        self.config.browserKwargs = {
+            'driver': driver,
+        }
         self.browser = webdriver.PhantomJS(executable_path=driver)
         self.initAfterBrowser()
 
@@ -81,11 +89,11 @@ class Browser(object):
         assert self.config.browserName
         self.close()
         if self.config.browserName == self.config.chrome:
-            self.initChrome(*self.config.browserArgs)
+            self.initChrome(**self.config.browserKwargs)
         elif self.config.browserName == self.config.firefox:
-            self.initFirefox(*self.config.browserArgs)
+            self.initFirefox(**self.config.browserKwargs)
         elif self.config.browserName == self.config.phantomJS:
-            self.initPhantomJS(*self.config.browserArgs)
+            self.initPhantomJS(**self.config.browserKwargs)
         else:
             raise StopIteration(self.config.browserName)
 
