@@ -2,6 +2,7 @@ import time
 from typing import List, Tuple, Callable, Union
 
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -53,13 +54,20 @@ class Browser(object):
     def __init__(self):
         self.config = Config()
 
-    def initChrome(self, driver: str, options=None):
+    def initChrome(self, driver: str, headless=False, args=None):
+        options = Options()
+        options.headless = headless
+        if args:
+            for arg in args:
+                options.add_argument(arg)
+
         self.config.browserName = self.config.chrome
         self.config.browserKwargs = {
             'driver': driver,
-            'options': options,
+            'headless': headless,
+            'args': args,
         }
-        self.browser = webdriver.Chrome(executable_path=driver, options=options)
+        self.browser = webdriver.Chrome(executable_path=driver, chrome_options=options)
         self.initAfterBrowser()
 
     def initFirefox(self, driver: str, binary: str):
