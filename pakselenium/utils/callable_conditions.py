@@ -1,18 +1,34 @@
 from typing import Union, Callable, Tuple
 
 
-def isReached(until: Union[Callable, Tuple[Callable]]):
-    if until is None:
+def _isReachedUntilOr(untilOr: Tuple[Callable, ...]):
+    if untilOr is None:
         return True
+
+    for i in untilOr:
+        if not i():
+            return False
+    return True
+
+
+def isReached(until: Union[Callable, Tuple[Callable, ...]], untilOr: Tuple[Callable, ...]):
+    if until is None:
+        if _isReachedUntilOr(untilOr):
+            return True
+        return False
 
     if type(until) is tuple:
         for i in until:
             if not i():
                 return False
-        return True
+        if _isReachedUntilOr(untilOr):
+            return True
+        return False
     else:
         if until():
-            return True
+            if _isReachedUntilOr(untilOr):
+                return True
+            return False
 
 
 def isEmpty(empty: Callable):

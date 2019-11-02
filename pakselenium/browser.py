@@ -163,7 +163,11 @@ class Browser(object):
         self.actions.perform()
         time.sleep(1.0)
 
-    def isReachedPage(self, until: Union[Callable, Tuple[Callable, ...]], empty: Callable, reload: Callable) -> bool:
+    def isReachedPage(self,
+                      until: Union[Callable, Tuple[Callable, ...]],
+                      untilOr: Tuple[Callable, ...],
+                      empty: Callable,
+                      reload: Callable) -> bool:
         tt = time.time()
         while 1:
             if CC.isEmpty(empty):
@@ -171,27 +175,33 @@ class Browser(object):
             if CC.isReload(reload):
                 self.browser.refresh()
                 continue
-            if CC.isReached(until):
+            if CC.isReached(until, untilOr):
                 return True
             if time.time() - tt >= self.config.timeoutWait:
                 return False
             time.sleep(0.5)
 
-    def click(self, pe: PageElement, until: Union[Callable, Tuple[Callable, ...]] = None,
-              empty: Callable = None, reload: Callable = None):
+    def click(self,
+              pe: PageElement,
+              until: Union[Callable, Tuple[Callable, ...]] = None,
+              untilOr: Tuple[Callable, ...] = None,
+              empty: Callable = None,
+              reload: Callable = None):
         self.wait.until(EC.isVisible(pe.element))
         pe.element.click()
         time.sleep(0.5)
 
         while 1:
-            if self.isReachedPage(until, empty, reload):
+            if self.isReachedPage(until, untilOr, empty, reload):
                 break
             else:
                 # print('>!> delay clicking "{}" button'.format(pe.text))
                 self.browser.refresh()
 
     @catch.timeoutException
-    def go(self, url, until: Union[Callable, Tuple[Callable, ...]] = None,
+    def go(self, url,
+           until: Union[Callable, Tuple[Callable, ...]] = None,
+           untilOr: Tuple[Callable, ...] = None,
            empty: Callable = None, reload: Callable = None):
         self.config.url = url
         while 1:
@@ -199,17 +209,19 @@ class Browser(object):
             time.sleep(1.0)
             self.wait.until(EC.url_contains(url))
 
-            if self.isReachedPage(until, empty, reload):
+            if self.isReachedPage(until, untilOr, empty, reload):
                 break
             else:
                 # print('>!> delay getting "{}"'.format(url))
                 self.browser.refresh()
 
-    def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
+    def refresh(self,
+                until: Union[Callable, Tuple[Callable, ...]] = None,
+                untilOr: Tuple[Callable, ...] = None):
         while 1:
             self.browser.refresh()
             time.sleep(5.0)
-            if CC.isReached(until):
+            if CC.isReached(until, untilOr):
                 break
 
     @property
