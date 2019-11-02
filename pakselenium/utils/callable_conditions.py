@@ -6,9 +6,9 @@ def _isReachedUntilOr(untilOr: Tuple[Callable, ...]):
         return True
 
     for i in untilOr:
-        if not i():
-            return False
-    return True
+        if i():
+            return True
+    return False
 
 
 def isReached(until: Union[Callable, Tuple[Callable, ...]], untilOr: Tuple[Callable, ...]):
