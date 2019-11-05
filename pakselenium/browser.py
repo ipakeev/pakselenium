@@ -49,10 +49,16 @@ class Browser(object):
     wait: WebDriverWait
     actions: ActionChains
     config: Config
+    isReachedUrl: Callable
     selector: str = By.CSS_SELECTOR
 
-    def __init__(self):
+    def __init__(self, isReachedUrl: Callable = None):
         self.config = Config()
+
+        if isReachedUrl is None:
+            self.isReachedUrl = EC.url_contains
+        else:
+            self.isReachedUrl = isReachedUrl
 
     def initChrome(self, driver: str, headless=False, args=None):
         options = Options()
@@ -207,7 +213,7 @@ class Browser(object):
         while 1:
             self.browser.get(url)
             time.sleep(1.0)
-            self.wait.until(EC.url_contains(url))
+            self.wait.until(self.isReachedUrl(url))
 
             if self.isReachedPage(until, untilOr, empty, reload):
                 break
