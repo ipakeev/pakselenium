@@ -56,7 +56,7 @@ class Browser(object):
         self.config = Config()
 
         if isReachedUrl is None:
-            self.isReachedUrl = EC.url_contains
+            self.isReachedUrl = EC.url_to_be
         else:
             self.isReachedUrl = isReachedUrl
 

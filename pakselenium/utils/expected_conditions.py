@@ -1,5 +1,4 @@
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.support.expected_conditions import url_contains
+from selenium.webdriver.support.expected_conditions import *
 
 
 class isVisible(object):
