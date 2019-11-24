@@ -5,13 +5,11 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.remote.webelement import WebElement
 
 from selenium.common.exceptions import WebDriverException
 from selenium.common.exceptions import NoSuchElementException
-# from urllib3.exceptions import MaxRetryError
 
 from .utils import callable_conditions as CC
 from .utils import expected_conditions as EC
@@ -49,18 +47,11 @@ class Browser(object):
     wait: WebDriverWait
     actions: ActionChains
     config: Config
-    isReachedUrl: Callable
-    selector: str = By.CSS_SELECTOR
 
-    def __init__(self, isReachedUrl: Callable = None):
+    def __init__(self):
         self.config = Config()
 
-        if isReachedUrl is None:
-            self.isReachedUrl = EC.url_to_be
-        else:
-            self.isReachedUrl = isReachedUrl
-
-    def initChrome(self, driver: str, headless=False, args=None):
+    def initChrome(self, driverPath: str, headless=False, args=None):
         options = Options()
         options.headless = headless
         if args:
@@ -69,28 +60,28 @@ class Browser(object):
 
         self.config.browserName = self.config.chrome
         self.config.browserKwargs = {
-            'driver': driver,
+            'driverPath': driverPath,
             'headless': headless,
             'args': args,
         }
-        self.browser = webdriver.Chrome(executable_path=driver, options=options)
+        self.browser = webdriver.Chrome(executable_path=driverPath, options=options)
         self.initAfterBrowser()
 
-    def initFirefox(self, driver: str, binary: str):
+    def initFirefox(self, driverPath: str, binary: str):
         self.config.browserName = self.config.firefox
         self.config.browserKwargs = {
-            'driver': driver,
+            'driverPath': driverPath,
             'binary': binary,
         }
-        self.browser = webdriver.Firefox(executable_path=driver, firefox_binary=FirefoxBinary(binary))
+        self.browser = webdriver.Firefox(executable_path=driverPath, firefox_binary=FirefoxBinary(binary))
         self.initAfterBrowser()
 
-    def initPhantomJS(self, driver: str):
+    def initPhantomJS(self, driverPath: str):
         self.config.browserName = self.config.phantomJS
         self.config.browserKwargs = {
-            'driver': driver,
+            'driverPath': driverPath,
         }
-        self.browser = webdriver.PhantomJS(executable_path=driver)
+        self.browser = webdriver.PhantomJS(executable_path=driverPath)
         self.initAfterBrowser()
 
     def initAfterBrowser(self):
@@ -117,36 +108,36 @@ class Browser(object):
         except WebDriverException:
             pass
 
-    def isOnPage(self, path: str) -> bool:
+    def isOnPage(self, selector: Tuple[str, str]) -> bool:
         try:
-            self.browser.find_element(self.selector, path)
+            self.browser.find_element(*selector)
             return True
         except NoSuchElementException:
             return False
 
     @catch.staleElementReferenceException
-    def findElement(self, path: str) -> PageElement:
-        assert self.isOnPage(path)
-        element = self.browser.find_element(self.selector, path)
+    def findElement(self, selector: Tuple[str, str]) -> PageElement:
+        assert self.isOnPage(selector)
+        element = self.browser.find_element(*selector)
         return PageElement(element)
 
     @catch.staleElementReferenceException
-    def findElements(self, path: str) -> List[PageElement]:
-        assert self.isOnPage(path)
-        es = self.browser.find_elements(self.selector, path)
+    def findElements(self, selector: Tuple[str, str]) -> List[PageElement]:
+        assert self.isOnPage(selector)
+        es = self.browser.find_elements(*selector)
         pes = []
         for element in es:
             pes.append(PageElement(element))
         return pes
 
     @catch.staleElementReferenceException
-    def findElementFrom(self, pe: PageElement, path: str) -> PageElement:
-        element = pe.element.find_element(self.selector, path)
+    def findElementFrom(self, pe: PageElement, selector: Tuple[str, str]) -> PageElement:
+        element = pe.element.find_element(*selector)
         return PageElement(element)
 
     @catch.staleElementReferenceException
-    def findElementsFrom(self, pe: PageElement, path: str) -> List[PageElement]:
-        es = pe.element.find_elements(self.selector, path)
+    def findElementsFrom(self, pe: PageElement, selector: Tuple[str, str]) -> List[PageElement]:
+        es = pe.element.find_elements(*selector)
         pes = []
         for element in es:
             pes.append(PageElement(element))
@@ -171,7 +162,6 @@ class Browser(object):
 
     def isReachedPage(self,
                       until: Union[Callable, Tuple[Callable, ...]],
-                      untilOr: Tuple[Callable, ...],
                       empty: Callable,
                       reload: Callable) -> bool:
         tt = time.time()
@@ -181,7 +171,7 @@ class Browser(object):
             if CC.isReload(reload):
                 self.browser.refresh()
                 continue
-            if CC.isReached(until, untilOr):
+            if CC.isReached(until):
                 return True
             if time.time() - tt >= self.config.timeoutWait:
                 return False
@@ -190,7 +180,6 @@ class Browser(object):
     def click(self,
               pe: PageElement,
               until: Union[Callable, Tuple[Callable, ...]] = None,
-              untilOr: Tuple[Callable, ...] = None,
               empty: Callable = None,
               reload: Callable = None):
         self.wait.until(EC.isVisible(pe.element))
@@ -198,7 +187,7 @@ class Browser(object):
         time.sleep(0.5)
 
         while 1:
-            if self.isReachedPage(until, untilOr, empty, reload):
+            if self.isReachedPage(until, empty, reload):
                 break
             else:
                 # print('>!> delay clicking "{}" button'.format(pe.text))
@@ -207,27 +196,29 @@ class Browser(object):
     @catch.timeoutException
     def go(self, url,
            until: Union[Callable, Tuple[Callable, ...]] = None,
-           untilOr: Tuple[Callable, ...] = None,
-           empty: Callable = None, reload: Callable = None):
+           empty: Callable = None,
+           reload: Callable = None,
+           isReachedUrl: Callable = None):
         self.config.url = url
         while 1:
             self.browser.get(url)
             time.sleep(1.0)
-            self.wait.until(self.isReachedUrl(url))
+            if isReachedUrl is not None:
+                self.wait.until(isReachedUrl(url))
+            else:
+                self.wait.until(EC.url_to_be(url))
 
-            if self.isReachedPage(until, untilOr, empty, reload):
+            if self.isReachedPage(until, empty, reload):
                 break
             else:
                 # print('>!> delay getting "{}"'.format(url))
                 self.browser.refresh()
 
-    def refresh(self,
-                until: Union[Callable, Tuple[Callable, ...]] = None,
-                untilOr: Tuple[Callable, ...] = None):
+    def refresh(self, until: Union[Callable, Tuple[Callable, ...]] = None):
         while 1:
             self.browser.refresh()
             time.sleep(5.0)
-            if CC.isReached(until, untilOr):
+            if CC.isReached(until):
                 break
 
     @property
