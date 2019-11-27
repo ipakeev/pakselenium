@@ -1,7 +1,8 @@
 import time
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
-from pakselenium.config import GLOBAL
+
+from ..config import GLOBAL
 
 
 def staleElementReferenceException(func):
