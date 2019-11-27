@@ -1,10 +1,14 @@
 import time
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
+from pakselenium.config import GLOBAL
 
 
 def staleElementReferenceException(func):
     def wrapper(self, *args, **kwargs):
+        if GLOBAL.debug:
+            return func(self, *args, **kwargs)
+
         while 1:
             try:
                 return func(self, *args, **kwargs)
@@ -23,6 +27,9 @@ def staleElementReferenceException(func):
 
 def timeoutException(func):
     def wrapper(self, *args, **kwargs):
+        if GLOBAL.debug:
+            return func(self, *args, **kwargs)
+
         while 1:
             try:
                 return func(self, *args, **kwargs)
