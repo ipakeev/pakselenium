@@ -187,14 +187,8 @@ class Browser(object):
         pe.element.click()
         time.sleep(0.5)
 
-        tt = time.time()
-        while 1:
-            if self.isReachedPage(until, empty, reload):
-                break
-            else:
-                if time.time() - tt > 10:
-                    raise StaleElementReferenceException
-                time.sleep(1)
+        if not self.isReachedPage(until, empty, reload):
+            raise StaleElementReferenceException
 
     @catch.timeoutException
     def go(self, url,
