@@ -10,6 +10,7 @@ from selenium.webdriver.remote.webelement import WebElement
 
 from selenium.common.exceptions import WebDriverException
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import StaleElementReferenceException
 
 from .utils import callable_conditions as CC
 from .utils import expected_conditions as EC
@@ -186,12 +187,14 @@ class Browser(object):
         pe.element.click()
         time.sleep(0.5)
 
+        tt = time.time()
         while 1:
             if self.isReachedPage(until, empty, reload):
                 break
             else:
-                # print('>!> delay clicking "{}" button'.format(pe.text))
-                self.browser.refresh()
+                if time.time() - tt > 10:
+                    raise StaleElementReferenceException
+                time.sleep(1)
 
     @catch.timeoutException
     def go(self, url,
