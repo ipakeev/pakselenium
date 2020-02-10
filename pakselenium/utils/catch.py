@@ -10,6 +10,7 @@ def staleElementReferenceException(func):
         if GLOBAL.debug:
             return func(self, *args, **kwargs)
 
+        tt = time.time()
         while 1:
             try:
                 return func(self, *args, **kwargs)
@@ -17,7 +18,9 @@ def staleElementReferenceException(func):
                 # when element is updating
                 # exc_info = sys.exc_info()
                 # traceback.print_exception(*exc_info)
-                pass
+                if time.time() - tt > 360:
+                    print('>!> raising StaleElementReferenceException')
+                    raise StaleElementReferenceException
             except Exception as e:
                 print('pakselenium staleElementReferenceException:', func, args, kwargs)
                 raise e
@@ -31,12 +34,15 @@ def timeoutException(func):
         if GLOBAL.debug:
             return func(self, *args, **kwargs)
 
+        tt = time.time()
         while 1:
             try:
                 return func(self, *args, **kwargs)
             except TimeoutException:
                 # when slow loading elements
-                pass
+                if time.time() - tt > 3600:
+                    print('>!> raising TimeoutException')
+                    raise TimeoutException
             except Exception as e:
                 print('pakselenium timeoutException:', func, args, kwargs)
                 raise e
