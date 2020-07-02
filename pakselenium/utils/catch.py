@@ -1,4 +1,5 @@
 import time
+
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
 
@@ -46,6 +47,8 @@ def timeoutException(func):
             except Exception as e:
                 print('pakselenium timeoutException:', func, args, kwargs)
                 raise e
+            print('>!> refresh on timeoutException')
+            self.refresh()
             time.sleep(5)
 
     return wrapper
