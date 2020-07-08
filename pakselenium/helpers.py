@@ -22,6 +22,7 @@ def close_popup(selector: Union[Selector, List[Selector]]):
                     for i in selector:
                         if browser.is_on_page(i):
                             browser.click(i)
+                            print(f'> closed popup: {i}')
 
         return wrapper
 

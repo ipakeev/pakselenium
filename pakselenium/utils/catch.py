@@ -1,54 +1,73 @@
+import sys
 import time
+import traceback
+from typing import Callable
 
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
 
-from ..config import GLOBAL
+debug: bool = False
 
 
-def staleElementReferenceException(func):
-    def wrapper(self, *args, **kwargs):
-        if GLOBAL.debug:
-            return func(self, *args, **kwargs)
-
-        tt = time.time()
-        while 1:
-            try:
+def staleElementReferenceException(call_on_exception: Callable = None, timer: int = 360, print_traceback: bool = True):
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            if debug:
                 return func(self, *args, **kwargs)
-            except StaleElementReferenceException:
-                # when element is updating
-                # exc_info = sys.exc_info()
-                # traceback.print_exception(*exc_info)
-                if time.time() - tt > 360:
-                    print('>!> raising StaleElementReferenceException')
-                    raise StaleElementReferenceException
-            except Exception as e:
-                print('pakselenium staleElementReferenceException:', func, args, kwargs)
-                raise e
-            time.sleep(1)
 
-    return wrapper
+            tt = time.time()
+            while 1:
+                try:
+                    return func(self, *args, **kwargs)
+                except StaleElementReferenceException as e:
+                    # when element is updating
+                    if print_traceback:
+                        exc_info = sys.exc_info()
+                        traceback.print_exception(*exc_info)
+
+                    if callable(call_on_exception):
+                        call_on_exception()
+
+                    if time.time() - tt > timer:
+                        print('>!> raising StaleElementReferenceException:', func, args, kwargs)
+                        raise e
+                except Exception as e:
+                    raise e
+                time.sleep(1)
+
+        return wrapper
+
+    return decorator
 
 
-def timeoutException(func):
-    def wrapper(self, *args, **kwargs):
-        if GLOBAL.debug:
-            return func(self, *args, **kwargs)
-
-        tt = time.time()
-        while 1:
-            try:
+def timeoutException(call_on_exception: Callable = None, timer: int = 3600, print_traceback: bool = True):
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            if debug:
                 return func(self, *args, **kwargs)
-            except TimeoutException:
-                # when slow loading elements
-                if time.time() - tt > 3600:
-                    print('>!> raising TimeoutException')
-                    raise TimeoutException
-            except Exception as e:
-                print('pakselenium timeoutException:', func, args, kwargs)
-                raise e
-            print('>!> refresh on timeoutException')
-            self.refresh()
-            time.sleep(5)
 
-    return wrapper
+            tt = time.time()
+            while 1:
+                try:
+                    return func(self, *args, **kwargs)
+                except TimeoutException as e:
+                    # when slow loading elements
+                    if print_traceback:
+                        exc_info = sys.exc_info()
+                        traceback.print_exception(*exc_info)
+
+                    if callable(call_on_exception):
+                        call_on_exception()
+
+                    if time.time() - tt > timer:
+                        print('>!> raising TimeoutException:', func, args, kwargs)
+                        raise e
+                except Exception as e:
+                    raise e
+                print('>!> refresh on timeoutException')
+                self.refresh()
+                time.sleep(5)
+
+        return wrapper
+
+    return decorator
