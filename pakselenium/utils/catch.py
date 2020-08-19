@@ -6,13 +6,14 @@ from typing import Callable
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
 
-debug: bool = False
+debug_staleElementReferenceException: bool = False
+debug_timeoutException: bool = False
 
 
 def staleElementReferenceException(call_on_exception: Callable = None, timer: int = 360, print_traceback: bool = True):
     def decorator(func):
         def wrapper(self, *args, **kwargs):
-            if debug:
+            if debug_staleElementReferenceException:
                 return func(self, *args, **kwargs)
 
             tt = time.time()
@@ -32,6 +33,9 @@ def staleElementReferenceException(call_on_exception: Callable = None, timer: in
                         print('>!> raising StaleElementReferenceException:', func, args, kwargs)
                         raise e
                 except Exception as e:
+                    if print_traceback:
+                        exc_info = sys.exc_info()
+                        traceback.print_exception(*exc_info)
                     raise e
                 time.sleep(1)
 
@@ -43,7 +47,7 @@ def staleElementReferenceException(call_on_exception: Callable = None, timer: in
 def timeoutException(call_on_exception: Callable = None, timer: int = 3600, print_traceback: bool = True):
     def decorator(func):
         def wrapper(self, *args, **kwargs):
-            if debug:
+            if debug_timeoutException:
                 return func(self, *args, **kwargs)
 
             tt = time.time()
@@ -63,6 +67,9 @@ def timeoutException(call_on_exception: Callable = None, timer: int = 3600, prin
                         print('>!> raising TimeoutException:', func, args, kwargs)
                         raise e
                 except Exception as e:
+                    if print_traceback:
+                        exc_info = sys.exc_info()
+                        traceback.print_exception(*exc_info)
                     raise e
                 print('>!> refresh on timeoutException')
                 self.refresh()
