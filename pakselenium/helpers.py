@@ -1,5 +1,5 @@
 import time
-from typing import List, Union
+from typing import List, Union, Callable
 
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
 
@@ -46,24 +46,19 @@ def close_popup(selector: Union[Selector, List[Selector]],
     return decorator
 
 
-def wait_on_error_page(selector: Union[Selector, List[Selector]]):
-    if isinstance(selector, Selector):
-        selector = [selector]
-
+def call_if_exception(to_call: Callable, exception=Exception, return_after_call=False):
     def decorator(func):
         def wrapper(self, *args, **kwargs):
             browser: Browser = self.browser
             while 1:
                 try:
                     return func(self, *args, **kwargs)
-                except Exception as e:
-                    if any([browser.is_on_page(i) for i in selector]):
-                        print(f'>!> Error page (Exception is {e}')
-                        time.sleep(60)
-                        browser.refresh()
-                        continue
-                    else:
-                        raise e
+                except exception as e:
+                    to_call(browser)
+                    print(f'>!> call_if_exception (Exception is {repr(e)}')
+                    time.sleep(2)
+                    if return_after_call:
+                        return
 
         return wrapper
 

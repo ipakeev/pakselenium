@@ -278,8 +278,8 @@ class Browser(object):
                 if not forever:
                     raise e
 
-    def _get_callable_until(self, until: Union[Selector, List[Selector], Callable, List[Callable]]
-                            ) -> Union[Callable, List[Callable]]:
+    def _get_callable_until(self, until: Union[Selector, List[Selector],
+                                               Callable, List[Callable]]) -> Union[Callable, List[Callable]]:
         if until is None:
             pass
         elif isinstance(until, Selector):
@@ -304,6 +304,30 @@ class Browser(object):
         else:
             raise StopIteration
         return until_lost
+
+    def condition_text_is_in(self, selector: Selector, text: str) -> bool:
+        if self.is_on_page(selector):
+            if text in self.find_element(selector).text:
+                return True
+        return False
+
+    def condition_text_not_in(self, selector: Selector, text: str) -> bool:
+        if self.is_on_page(selector):
+            if text not in self.find_element(selector).text:
+                return True
+        return False
+
+    def condition_text_equal(self, selector: Selector, text: str) -> bool:
+        if self.is_on_page(selector):
+            if text == self.find_element(selector).text:
+                return True
+        return False
+
+    def condition_text_not_equal(self, selector: Selector, text: str) -> bool:
+        if self.is_on_page(selector):
+            if text != self.find_element(selector).text:
+                return True
+        return False
 
     def is_reached_page(self, until: Union[Selector, List[Selector], Callable, List[Callable]],
                         until_lost: Union[Selector, List[Selector]], empty: Callable, reload: Callable) -> bool:
