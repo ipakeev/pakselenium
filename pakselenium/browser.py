@@ -15,7 +15,7 @@ from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 
-from pakselenium.config import debug_verbose
+from pakselenium import config
 from pakselenium.utils import callable_conditions as CC
 from pakselenium.utils import catch
 from pakselenium.utils import expected_conditions as EC
@@ -66,7 +66,7 @@ class Settings(object):
 
 
 def log(msg: Optional[str], min_verbose: int = 2):
-    if msg and debug_verbose >= min_verbose:
+    if msg and config.debug_verbose >= min_verbose:
         print(msg)
 
 
@@ -76,8 +76,8 @@ class Browser(object):
     driver_actions: ActionChains
     settings: Settings
 
-    def __init__(self, config: Settings = None):
-        self.settings = config or Settings()
+    def __init__(self, settings: Settings = None):
+        self.settings = settings or Settings()
 
     def init_chrome(self, driver_path: str, options: ChromeOptions = None):
         self.settings.driver_name = self.settings.chrome
