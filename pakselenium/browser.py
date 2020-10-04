@@ -29,7 +29,10 @@ class Selector:
         self.desc = desc
 
     def __repr__(self):
-        return f"Selector('{self.by}', '{self.value}', '{self.desc}')"
+        if self.desc:
+            return f"Selector('{self.desc}')"
+        else:
+            return f"Selector('{self.by}', '{self.value}')"
 
     @property
     def locator(self) -> Tuple[str, str]:
@@ -45,7 +48,7 @@ class PageElement(object):
         self.text = self.element.text.strip()
 
     def __repr__(self):
-        return f"PageElement({self.element}, '{self.text}')"
+        return f"PageElement('{self.text}')"
 
     def is_displayed(self):
         return self.element.is_displayed()
@@ -346,33 +349,49 @@ class Browser(object):
 
     def condition_text_is_in(self, selector: Selector, text: str, desc: str = None) -> bool:
         if self.is_on_page(selector):
-            if text in self.find_element(selector).text:
-                log(f'[condition_text_is_in:True]: {desc}: "{text}" in {selector}' if desc else None)
+            found = self.find_element(selector).text
+            if text in found:
+                log(f'[condition_text_is_in:True]: {desc}: "{text}" in {found}' if desc else None)
                 return True
+            else:
+                log(f'[condition_text_is_in:False]: {desc}: "{text}" not in {found}' if desc else None)
+                return False
         log(f'[condition_text_is_in:False]: {desc}: "{text}" not in {selector}' if desc else None)
         return False
 
     def condition_text_not_in(self, selector: Selector, text: str, desc: str = None) -> bool:
         if self.is_on_page(selector):
-            if text not in self.find_element(selector).text:
-                log(f'[condition_text_not_in:True]: {desc}: "{text}" not in {selector}' if desc else None)
+            found = self.find_element(selector).text
+            if text not in found:
+                log(f'[condition_text_not_in:True]: {desc}: "{text}" not in {found}' if desc else None)
                 return True
+            else:
+                log(f'[condition_text_not_in:False]: {desc}: "{text}" in {found}' if desc else None)
+                return False
         log(f'[condition_text_not_in:False]: {desc}: "{text}" in {selector}' if desc else None)
         return False
 
     def condition_text_equal(self, selector: Selector, text: str, desc: str = None) -> bool:
         if self.is_on_page(selector):
-            if text == self.find_element(selector).text:
-                log(f'[condition_text_equal:True]: {desc}: "{text}" == {selector}' if desc else None)
+            found = self.find_element(selector).text
+            if text == found:
+                log(f'[condition_text_equal:True]: {desc}: "{text}" == {found}' if desc else None)
                 return True
+            else:
+                log(f'[condition_text_equal:False]: {desc}: "{text}" != {found}' if desc else None)
+                return False
         log(f'[condition_text_equal:False]: {desc}: "{text}" != {selector}' if desc else None)
         return False
 
     def condition_text_not_equal(self, selector: Selector, text: str, desc: str = None) -> bool:
         if self.is_on_page(selector):
-            if text != self.find_element(selector).text:
-                log(f'[condition_text_not_equal:True]: {desc}: "{text}" != {selector}' if desc else None)
+            found = self.find_element(selector).text
+            if text != found:
+                log(f'[condition_text_not_equal:True]: {desc}: "{text}" != {found}' if desc else None)
                 return True
+            else:
+                log(f'[condition_text_not_equal:False]: {desc}: "{text}" == {found}' if desc else None)
+                return False
         log(f'[condition_text_not_equal:False]: {desc}: "{text}" == {selector}' if desc else None)
         return False
 

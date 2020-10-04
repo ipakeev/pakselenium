@@ -36,6 +36,8 @@ def close_popup(selector: Union[Selector, List[Selector]], desc: str = None,
                     answer = func(self, *args, **kwargs)
                     break
                 except (NoSuchElementException, ElementClickInterceptedException):
+                    if debug_verbose > 0:
+                        print(f'[{desc}]: caught Exception')
                     if n >= 3:
                         raise
                     if on_error:
