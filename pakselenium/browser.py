@@ -1,6 +1,6 @@
 import time
 from functools import partial
-from typing import List, Callable, Union, Tuple
+from typing import List, Callable, Union, Tuple, Optional
 
 import numpy as np
 from selenium import webdriver
@@ -15,19 +15,21 @@ from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 
-from .utils import callable_conditions as CC
-from .utils import catch
-from .utils import expected_conditions as EC
+from pakselenium.config import debug_verbose
+from pakselenium.utils import callable_conditions as CC
+from pakselenium.utils import catch
+from pakselenium.utils import expected_conditions as EC
 
 
 class Selector:
 
-    def __init__(self, by: str, value: str):
+    def __init__(self, by: str, value: str, desc: str = None):
         self.by = by
         self.value = value
+        self.desc = desc
 
     def __repr__(self):
-        return f"Selector('{self.by}', '{self.value}')"
+        return f"Selector('{self.by}', '{self.value}', '{self.desc}')"
 
     @property
     def locator(self) -> Tuple[str, str]:
@@ -42,6 +44,9 @@ class PageElement(object):
         self.element = element
         self.text = self.element.text.strip()
 
+    def __repr__(self):
+        return f"PageElement({self.element}, '{self.text}')"
+
     def is_displayed(self):
         return self.element.is_displayed()
 
@@ -49,7 +54,7 @@ class PageElement(object):
         return self.element.get_attribute(name)
 
 
-class Config(object):
+class Settings(object):
     driver_name: str
     driver_kwargs: dict
     timeout_wait: int = 20
@@ -60,18 +65,23 @@ class Config(object):
     phantomJS: str = 'phantomJS'
 
 
+def log(msg: Optional[str], min_verbose: int = 2):
+    if msg and debug_verbose >= min_verbose:
+        print(msg)
+
+
 class Browser(object):
     driver: webdriver.Chrome
     driver_wait: WebDriverWait
     driver_actions: ActionChains
-    config: Config
+    settings: Settings
 
-    def __init__(self, config: Config = None):
-        self.config = config or Config()
+    def __init__(self, config: Settings = None):
+        self.settings = config or Settings()
 
     def init_chrome(self, driver_path: str, options: ChromeOptions = None):
-        self.config.driver_name = self.config.chrome
-        self.config.driver_kwargs = {
+        self.settings.driver_name = self.settings.chrome
+        self.settings.driver_kwargs = {
             'driver_path': driver_path,
             'options': options,
         }
@@ -79,8 +89,8 @@ class Browser(object):
         self.init_after_browser()
 
     def init_firefox(self, driver_path: str, binary_path: str):
-        self.config.driver_name = self.config.firefox
-        self.config.driver_kwargs = {
+        self.settings.driver_name = self.settings.firefox
+        self.settings.driver_kwargs = {
             'driver_path': driver_path,
             'binary_path': binary_path,
         }
@@ -88,30 +98,30 @@ class Browser(object):
         self.init_after_browser()
 
     def init_phantomJS(self, driver_path: str):
-        self.config.driver_name = self.config.phantomJS
-        self.config.driver_kwargs = {
+        self.settings.driver_name = self.settings.phantomJS
+        self.settings.driver_kwargs = {
             'driver_path': driver_path,
         }
         self.driver = webdriver.PhantomJS(executable_path=driver_path)
         self.init_after_browser()
 
     def init_after_browser(self):
-        self.driver.implicitly_wait(self.config.implicit_wait)
-        self.driver_wait = WebDriverWait(self.driver, self.config.timeout_wait)
+        self.driver.implicitly_wait(self.settings.implicit_wait)
+        self.driver_wait = WebDriverWait(self.driver, self.settings.timeout_wait)
         self.driver_actions = ActionChains(self.driver)
         time.sleep(1.0)
 
     def new_session(self):
-        assert self.config.driver_name
+        assert self.settings.driver_name
         self.close()
-        if self.config.driver_name == self.config.chrome:
-            self.init_chrome(**self.config.driver_kwargs)
-        elif self.config.driver_name == self.config.firefox:
-            self.init_firefox(**self.config.driver_kwargs)
-        elif self.config.driver_name == self.config.phantomJS:
-            self.init_phantomJS(**self.config.driver_kwargs)
+        if self.settings.driver_name == self.settings.chrome:
+            self.init_chrome(**self.settings.driver_kwargs)
+        elif self.settings.driver_name == self.settings.firefox:
+            self.init_firefox(**self.settings.driver_kwargs)
+        elif self.settings.driver_name == self.settings.phantomJS:
+            self.init_phantomJS(**self.settings.driver_kwargs)
         else:
-            raise StopIteration(self.config.driver_name)
+            raise StopIteration(self.settings.driver_name)
 
     def close(self):
         try:
@@ -119,78 +129,97 @@ class Browser(object):
         except WebDriverException:
             pass
 
-    def is_on_page(self, selector: Selector) -> bool:
+    def is_on_page(self, selector: Selector, desc: str = None) -> bool:
         try:
             self.driver.find_element(selector.by, selector.value)
+            log(f'[is_on_page:True]: {desc}: {selector.desc}' if desc else None)
             return True
         except NoSuchElementException:
+            log(f'[is_on_page:False]: {desc}: {selector.desc}' if desc else None)
             return False
 
     @catch.staleElementReferenceException()
-    def find_element(self, selector: Selector) -> PageElement:
+    def find_element(self, selector: Selector, desc: str = None) -> PageElement:
+        log(f'[find_element]: {desc}: {selector.desc}' if desc else None)
         if not self.is_on_page(selector):
             raise NoSuchElementException
         element = self.driver.find_element(selector.by, selector.value)
-        return PageElement(element)
+        pe = PageElement(element)
+        log(f'[find_element]: {desc}: {selector.desc} found {pe}' if desc else None)
+        return pe
 
     @catch.staleElementReferenceException()
-    def find_elements(self, selector: Selector) -> List[PageElement]:
+    def find_elements(self, selector: Selector, desc: str = None) -> List[PageElement]:
+        log(f'[find_elements]: {desc}: {selector.desc}' if desc else None)
         if not self.is_on_page(selector):
             raise NoSuchElementException
         es = self.driver.find_elements(selector.by, selector.value)
         pes = []
         for element in es:
             pes.append(PageElement(element))
+        log(f'[find_elements]: {desc}: {selector.desc} found {pes}' if desc else None)
         return pes
 
     @catch.staleElementReferenceException()
-    def find_elements_with_text(self, selector: Selector, element_text: str) -> List[PageElement]:
+    def find_elements_with_text(self, selector: Selector, element_text: str, desc: str = None) -> List[PageElement]:
+        log(f'[find_elements_with_text]: {desc}: {selector.desc} with "{element_text}"' if desc else None)
         pe = self.find_elements(selector)
         es = [i for i in pe if i.text == element_text]
         if not es:
             raise NoSuchElementException
+        log(f'[find_elements_with_text]: {desc}: {selector.desc} with "{element_text}" found {es}' if desc else None)
         return es
 
     @catch.staleElementReferenceException()
-    def find_elements_contains(self, selector: Selector, element_text: str) -> List[PageElement]:
+    def find_elements_contains(self, selector: Selector, element_text: str, desc: str = None) -> List[PageElement]:
+        log(f'[find_elements_contains]: {desc}: {selector.desc} contains "{element_text}"' if desc else None)
         pe = self.find_elements(selector)
         es = [i for i in pe if element_text in i.text]
         if not es:
             raise NoSuchElementException
+        log(f'[find_elements_contains]: {desc}: {selector.desc} contains "{element_text}" found {es}' if desc else None)
         return es
 
     @catch.staleElementReferenceException()
-    def find_element_from(self, pe: PageElement, selector: Selector) -> PageElement:
-        element = pe.element.find_element(selector.by, selector.value)
-        return PageElement(element)
+    def find_element_from(self, from_pe: PageElement, selector: Selector, desc: str = None) -> PageElement:
+        log(f'[find_element_from]: {desc}: {selector.desc} from {from_pe.text}' if desc else None)
+        element = from_pe.element.find_element(selector.by, selector.value)
+        pe = PageElement(element)
+        log(f'[find_element_from]: {desc}: {selector.desc} from {from_pe.text} found {pe}' if desc else None)
+        return pe
 
     @catch.staleElementReferenceException()
-    def find_elements_from(self, pe: PageElement, selector: Selector) -> List[PageElement]:
-        es = pe.element.find_elements(selector.by, selector.value)
+    def find_elements_from(self, from_pe: PageElement, selector: Selector, desc: str = None) -> List[PageElement]:
+        log(f'[find_elements_from]: {desc}: {selector.desc} from {from_pe.text}' if desc else None)
+        es = from_pe.element.find_elements(selector.by, selector.value)
         pes = []
         for element in es:
             pes.append(PageElement(element))
+        log(f'[find_elements_from]: {desc}: {selector.desc} from {from_pe.text} found {pes}' if desc else None)
         return pes
 
     @catch.staleElementReferenceException()
-    def find_element_with_text_from(self, pe: PageElement, selector: Selector, text: str) -> PageElement:
-        pe = self.find_elements_from(pe, selector)
-        es = [i for i in pe if i.text == text]
-        if not es:
+    def find_element_with_text_from(self, from_pe: PageElement, selector: Selector, text: str,
+                                    desc: str = None) -> PageElement:
+        log(f'[find_elements_from]: {desc}: {selector.desc} from {from_pe.text}' if desc else None)
+        pe = self.find_elements_from(from_pe, selector)
+        pes = [i for i in pe if i.text == text]
+        if not pes:
             raise NoSuchElementException
-        return es[0]
+        log(f'[find_elements_from]: {desc}: {selector.desc} from {from_pe.text} found {pes}' if desc else None)
+        return pes[0]
 
     def get_page_element(self, selector: Union[Selector, PageElement], element_text: str = None,
-                         element_index: int = None) -> PageElement:
+                         element_index: int = None, desc: str = None) -> PageElement:
         if isinstance(selector, Selector):
             element_index = 0 if element_index is None else element_index
             if element_text:
-                return self.find_elements_with_text(selector, element_text)[element_index]
+                return self.find_elements_with_text(selector, element_text, desc=desc)[element_index]
             else:
                 if element_index == 0:
-                    return self.find_element(selector)
+                    return self.find_element(selector, desc=desc)
                 else:
-                    return self.find_elements(selector)[element_index]
+                    return self.find_elements(selector, desc=desc)[element_index]
         elif isinstance(selector, PageElement):
             assert element_text is None
             assert element_index is None
@@ -198,59 +227,65 @@ class Browser(object):
         else:
             raise StopIteration
 
-    def get_is_on_page_callable(self, selector: Selector) -> Callable:
-        return lambda: self.is_on_page(selector)
+    def get_is_on_page_callable(self, selector: Selector, desc: str = None) -> Callable:
+        return lambda: self.is_on_page(selector, desc=desc)
 
-    def get_is_not_on_page_callable(self, selector: Selector) -> Callable:
-        return lambda: not self.is_on_page(selector)
+    def get_is_not_on_page_callable(self, selector: Selector, desc: str = None) -> Callable:
+        return lambda: not self.is_on_page(selector, desc=desc)
 
-    def wait_until_on_page(self, selector: Union[Selector, List[Selector]], forever: bool = False):
+    def wait_until_on_page(self, selector: Union[Selector, List[Selector]],
+                           forever: bool = False, desc: str = None):
         if isinstance(selector, Selector):
-            func = self.get_is_on_page_callable(selector)
+            func = self.get_is_on_page_callable(selector, desc=desc)
         else:
-            func = [self.get_is_on_page_callable(i) for i in selector]
+            func = [self.get_is_on_page_callable(i, desc=desc) for i in selector]
         self.wait_until(func, forever=forever)
 
-    def wait_until_not_on_page(self, selector: Union[Selector, List[Selector]], forever: bool = False):
+    def wait_until_not_on_page(self, selector: Union[Selector, List[Selector]],
+                               forever: bool = False, desc: str = None):
         if isinstance(selector, Selector):
-            func = self.get_is_not_on_page_callable(selector)
+            func = self.get_is_not_on_page_callable(selector, desc=desc)
         else:
-            func = [self.get_is_not_on_page_callable(i) for i in selector]
+            func = [self.get_is_not_on_page_callable(i, desc=desc) for i in selector]
         self.wait_until(func, forever=forever)
 
     def wait_until_selector(self, EC_condition: Callable,
-                            selector: Union[Selector, List[Selector]], *args, forever: bool = False, **kwargs):
+                            selector: Union[Selector, List[Selector]], *args,
+                            forever: bool = False, desc: str = None, **kwargs):
         if isinstance(selector, Selector):
             func = partial(EC_condition(selector.locator, *args, **kwargs), self.driver)
         else:
             func = [partial(EC_condition(i.locator, *args, **kwargs), self.driver) for i in selector]
-        self.wait_until(func, forever=forever)
+        self.wait_until(func, forever=forever, desc=desc)
 
     def wait_until_not_selector(self, EC_condition: Callable,
-                                selector: Union[Selector, List[Selector]], *args, forever: bool = False, **kwargs):
+                                selector: Union[Selector, List[Selector]], *args,
+                                forever: bool = False, desc: str = None, **kwargs):
         if isinstance(selector, Selector):
             func = partial(EC_condition(selector.locator, *args, **kwargs), self.driver)
         else:
             func = [partial(EC_condition(i.locator, *args, **kwargs), self.driver) for i in selector]
-        self.wait_until_not(func, forever=forever)
+        self.wait_until_not(func, forever=forever, desc=desc)
 
     def wait_until_page_element(self, EC_condition: Callable,
-                                pe: Union[PageElement, List[PageElement]], *args, forever: bool = False, **kwargs):
+                                pe: Union[PageElement, List[PageElement]], *args,
+                                forever: bool = False, desc: str = None, **kwargs):
         if isinstance(pe, PageElement):
             func = partial(EC_condition(pe.element, *args, **kwargs), self.driver)
         else:
             func = [partial(EC_condition(i.element, *args, **kwargs), self.driver) for i in pe]
-        self.wait_until(func, forever=forever)
+        self.wait_until(func, forever=forever, desc=desc)
 
     def wait_until_not_page_element(self, EC_condition: Callable,
-                                    pe: Union[PageElement, List[PageElement]], *args, forever: bool = False, **kwargs):
+                                    pe: Union[PageElement, List[PageElement]], *args,
+                                    forever: bool = False, desc: str = None, **kwargs):
         if isinstance(pe, PageElement):
             func = partial(EC_condition(pe.element, *args, **kwargs), self.driver)
         else:
             func = [partial(EC_condition(i.element, *args, **kwargs), self.driver) for i in pe]
-        self.wait_until_not(func, forever=forever)
+        self.wait_until_not(func, forever=forever, desc=desc)
 
-    def wait_until(self, func: Union[Callable, List[Callable]], forever: bool = False):
+    def wait_until(self, func: Union[Callable, List[Callable]], forever: bool = False, desc: str = None):
         if type(func) is list:
             until = lambda driver: all([i() for i in func])
         else:
@@ -258,13 +293,15 @@ class Browser(object):
 
         while 1:
             try:
+                log(f'[wait_until]: {desc}' if desc else None)
                 self.driver_wait.until(until)
                 break
             except TimeoutException as e:
+                log(f'[wait_until]: {desc} caught TimeoutException', 1)
                 if not forever:
                     raise e
 
-    def wait_until_not(self, func: Union[Callable, List[Callable]], forever: bool = False):
+    def wait_until_not(self, func: Union[Callable, List[Callable]], forever: bool = False, desc: str = None):
         if type(func) is list:
             until = lambda driver: all([not i() for i in func])
         else:
@@ -272,9 +309,11 @@ class Browser(object):
 
         while 1:
             try:
+                log(f'[wait_until]: {desc}' if desc else None)
                 self.driver_wait.until(until)
                 break
             except TimeoutException as e:
+                log(f'[wait_until]: {desc} caught TimeoutException', 1)
                 if not forever:
                     raise e
 
@@ -305,36 +344,46 @@ class Browser(object):
             raise StopIteration
         return until_lost
 
-    def condition_text_is_in(self, selector: Selector, text: str) -> bool:
+    def condition_text_is_in(self, selector: Selector, text: str, desc: str = None) -> bool:
         if self.is_on_page(selector):
             if text in self.find_element(selector).text:
+                log(f'[condition_text_is_in:True]: {desc}: "{text}" in {selector}' if desc else None)
                 return True
+        log(f'[condition_text_is_in:False]: {desc}: "{text}" not in {selector}' if desc else None)
         return False
 
-    def condition_text_not_in(self, selector: Selector, text: str) -> bool:
+    def condition_text_not_in(self, selector: Selector, text: str, desc: str = None) -> bool:
         if self.is_on_page(selector):
             if text not in self.find_element(selector).text:
+                log(f'[condition_text_not_in:True]: {desc}: "{text}" not in {selector}' if desc else None)
                 return True
+        log(f'[condition_text_not_in:False]: {desc}: "{text}" in {selector}' if desc else None)
         return False
 
-    def condition_text_equal(self, selector: Selector, text: str) -> bool:
+    def condition_text_equal(self, selector: Selector, text: str, desc: str = None) -> bool:
         if self.is_on_page(selector):
             if text == self.find_element(selector).text:
+                log(f'[condition_text_equal:True]: {desc}: "{text}" == {selector}' if desc else None)
                 return True
+        log(f'[condition_text_equal:False]: {desc}: "{text}" != {selector}' if desc else None)
         return False
 
-    def condition_text_not_equal(self, selector: Selector, text: str) -> bool:
+    def condition_text_not_equal(self, selector: Selector, text: str, desc: str = None) -> bool:
         if self.is_on_page(selector):
             if text != self.find_element(selector).text:
+                log(f'[condition_text_not_equal:True]: {desc}: "{text}" != {selector}' if desc else None)
                 return True
+        log(f'[condition_text_not_equal:False]: {desc}: "{text}" == {selector}' if desc else None)
         return False
 
     def is_reached_page(self, until: Union[Selector, List[Selector], Callable, List[Callable]],
-                        until_lost: Union[Selector, List[Selector]], empty: Callable, reload: Callable) -> bool:
+                        until_lost: Union[Selector, List[Selector]], empty: Callable, reload: Callable,
+                        desc: str = None) -> bool:
         until = self._get_callable_until(until)
         until_lost = self._get_callable_until_lost(until_lost)
         tt = time.time()
         while 1:
+            log(f'[is_reached_page]: {desc}' if desc else None)
             if CC.is_empty(empty):
                 return True
             if CC.is_reload(reload):
@@ -342,7 +391,7 @@ class Browser(object):
                 continue
             if CC.is_reached(until) and CC.is_reached(until_lost):
                 return True
-            if time.time() - tt >= self.config.timeout_wait:
+            if time.time() - tt >= self.settings.timeout_wait:
                 return False
             time.sleep(0.5)
 
@@ -350,9 +399,11 @@ class Browser(object):
     def go(self, url: str,
            until: Union[Selector, List[Selector], Callable, List[Callable]] = None,
            until_lost: Union[Selector, List[Selector]] = None,
-           empty: Callable = None, reload: Callable = None, is_reached_url: Callable = None, sleep: float = 1.0):
-        self.config.url = url
+           empty: Callable = None, reload: Callable = None, is_reached_url: Callable = None, sleep: float = 1.0,
+           desc: str = None):
+        self.settings.url = url
         while 1:
+            log(f'[go:"{url}"]: {desc}' if desc else None)
             self.driver.get(url)
             time.sleep(sleep)
 
@@ -363,6 +414,7 @@ class Browser(object):
                 break
             else:
                 # print('>!> delay getting "{}"'.format(url))
+                log(f'[go:refresh:"{url}"]: {desc}' if desc else None)
                 self.driver.refresh()
 
     @catch.timeoutException()
@@ -370,7 +422,8 @@ class Browser(object):
     def click(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
               until: Union[Selector, List[Selector], Callable, List[Callable]] = None,
               until_lost: Union[Selector, List[Selector]] = None,
-              empty: Callable = None, reload: Callable = None, sleep: float = 0.5):
+              empty: Callable = None, reload: Callable = None, sleep: float = 0.5, desc: str = None):
+        log(f'[click:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None)
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_text=element_text, element_index=element_index)
@@ -380,7 +433,9 @@ class Browser(object):
         if not self.is_reached_page(until, until_lost, empty, reload):
             raise StaleElementReferenceException
 
-    def refresh(self, until: Union[Selector, List[Selector], Callable, List[Callable]] = None, sleep: float = 5.0):
+    def refresh(self, until: Union[Selector, List[Selector], Callable, List[Callable]] = None, sleep: float = 5.0,
+                desc: str = None):
+        log(f'[refresh]: {desc}' if desc else None)
         until = self._get_callable_until(until)
         while 1:
             self.driver.refresh()
@@ -392,10 +447,12 @@ class Browser(object):
     def current_url(self) -> str:
         return self.driver.current_url
 
-    def get_cookies(self) -> dict:
+    def get_cookies(self, desc: str = None) -> dict:
+        log(f'[get_cookies]: {desc}' if desc else None)
         return self.driver.get_cookies()
 
-    def set_cookies(self, cookies):
+    def set_cookies(self, cookies, desc: str = None):
+        log(f'[set_cookies]: {desc}' if desc else None)
         for cookie in cookies:
             if 'expiry' in cookie:
                 del cookie['expiry']
@@ -403,7 +460,8 @@ class Browser(object):
 
     @catch.staleElementReferenceException()
     def select(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
-               sleep: float = 0.5):
+               sleep: float = 0.5, desc: str = None):
+        log(f'[select:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None)
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_text=element_text, element_index=element_index)
@@ -414,7 +472,8 @@ class Browser(object):
 
     @catch.staleElementReferenceException()
     def deselect(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
-                 sleep: float = 0.5):
+                 sleep: float = 0.5, desc: str = None):
+        log(f'[deselect:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None)
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_text=element_text, element_index=element_index)
@@ -424,7 +483,8 @@ class Browser(object):
         time.sleep(sleep)
 
     def fill_text(self, selector: Union[Selector, PageElement], text: str, element_index: int = None,
-                  clear: bool = True, quick: bool = False, sleep: float = 0.5):
+                  clear: bool = True, quick: bool = False, sleep: float = 0.5, desc: str = None):
+        log(f'[fill_text:{selector}={text}]: {desc}' if desc else None)
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_index=element_index)
@@ -436,12 +496,13 @@ class Browser(object):
         else:
             for s in text:
                 pe.element.send_keys(s)
-                time.sleep(np.random.random() / 5)
+                time.sleep(np.random.random() / 10)
 
         time.sleep(sleep)
 
     def fill_text_one_by_one(self, selector: Selector, texts: List[str], check_length: bool = True,
-                             quick: bool = False, sleep: float = 0.5):
+                             quick: bool = False, sleep: float = 0.5, desc: str = None):
+        log(f'[fill_text_one_by_one:{selector}={texts}]: {desc}' if desc else None)
         self.wait_until_selector(EC.element_to_be_clickable, selector)
         pes = self.find_elements(selector)
         if check_length:
@@ -456,7 +517,8 @@ class Browser(object):
         time.sleep(sleep)
 
     def move_cursor(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
-                    sleep: float = 0.5):
+                    sleep: float = 0.5, desc: str = None):
+        log(f'[move_cursor:{selector}]: {desc}' if desc else None)
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_text=element_text, element_index=element_index)
@@ -468,7 +530,8 @@ class Browser(object):
     def drug_and_drop(self, source: Union[Selector, PageElement], target: Union[Selector, PageElement],
                       source_text: str = None, target_text: str = None,
                       source_index: int = None, target_index: int = None,
-                      sleep: float = 0.5):
+                      sleep: float = 0.5, desc: str = None):
+        log(f'[drug_and_drop:{source}->{target}]: {desc}' if desc else None)
         if isinstance(source, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, source)
         if isinstance(target, Selector):
@@ -479,18 +542,23 @@ class Browser(object):
         self.driver_actions.drag_and_drop(source, target).perform()
         time.sleep(sleep)
 
-    def press_key(self, key):
+    def press_key(self, key, desc: str = None):
+        log(f'[press_key:{key}]: {desc}' if desc else None)
         self.driver_actions.reset_actions()
         self.driver_actions.key_down(key).key_up(key).perform()
 
-    def press_Enter(self):
+    def press_Enter(self, desc: str = None):
+        log(f'[press_Enter]: {desc}' if desc else None)
         self.press_key(Keys.ENTER)
 
-    def press_Backspace(self):
+    def press_Backspace(self, desc: str = None):
+        log(f'[press_Backspace]: {desc}' if desc else None)
         self.press_key(Keys.BACKSPACE)
 
-    def press_Tab(self):
+    def press_Tab(self, desc: str = None):
+        log(f'[press_Tab]: {desc}' if desc else None)
         self.press_key(Keys.TAB)
 
-    def press_Esc(self):
+    def press_Esc(self, desc: str = None):
+        log(f'[press_Esc]: {desc}' if desc else None)
         self.press_key(Keys.ESCAPE)
