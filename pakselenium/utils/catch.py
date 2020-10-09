@@ -1,92 +1,175 @@
 import sys
 import time
 import traceback
-from typing import Callable
+from typing import List, Union, Callable
 
+from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
 
-from pakselenium.config import debug_verbose, debug_staleElementReferenceException, debug_timeoutException
+from pakselenium import config
+from pakselenium.browser import Browser, Selector
 
 
-def staleElementReferenceException(call_on_exception: Callable = None, timer: int = 360, desc: str = None,
-                                   print_traceback: bool = False):
+def staleElementReferenceException(to_call: Callable = None,
+                                   desc: str = None, print_traceback: bool = False,
+                                   return_on_exception: bool = False, sleep: int = 0):
     def decorator(func):
-        def wrapper(self, *args, **kwargs):
-            if debug_verbose > 1 and desc is not None:
-                print(f'[{desc}]: [{self}, {args}, {kwargs}]')
+        def wrapper(*args, **kwargs):
+            if config.debug_verbose >= 2 and desc is not None:
+                print(f'[{desc}]: [{args}, {kwargs}]')
 
-            if debug_staleElementReferenceException:
-                return func(self, *args, **kwargs)
+            if config.debug_all or config.debug_staleElementReferenceException:
+                return func(*args, **kwargs)
 
-            tt = time.time()
             while 1:
                 try:
-                    return func(self, *args, **kwargs)
+                    return func(*args, **kwargs)
                 except StaleElementReferenceException as e:
                     # when element is updating
-                    if debug_verbose > 0:
+                    if config.debug_verbose >= 1:
                         print(f'[{desc}]: caught StaleElementReferenceException')
 
                     if print_traceback:
                         exc_info = sys.exc_info()
                         traceback.print_exception(*exc_info)
 
-                    if callable(call_on_exception):
-                        call_on_exception()
+                    if callable(to_call):
+                        if to_call():
+                            return e
 
-                    if time.time() - tt > timer:
-                        print('>!> raising StaleElementReferenceException:', func, args, kwargs)
-                        raise e
+                    if return_on_exception:
+                        return e
                 except Exception as e:
                     if print_traceback:
                         exc_info = sys.exc_info()
                         traceback.print_exception(*exc_info)
                     raise e
-                time.sleep(1)
+
+                time.sleep(sleep)
 
         return wrapper
 
     return decorator
 
 
-def timeoutException(call_on_exception: Callable = None, timer: int = 3600, desc: str = None,
-                     print_traceback: bool = False):
+def timeoutException(to_call: Callable = None,
+                     desc: str = None, print_traceback: bool = False,
+                     return_on_exception: bool = False, sleep: int = 0):
     def decorator(func):
-        def wrapper(self, *args, **kwargs):
-            if debug_verbose > 1 and desc is not None:
-                print(f'[{desc}]: [{self}, {args}, {kwargs}]')
+        def wrapper(*args, **kwargs):
+            if config.debug_verbose >= 2 and desc is not None:
+                print(f'[{desc}]: [{args}, {kwargs}]')
 
-            if debug_timeoutException:
-                return func(self, *args, **kwargs)
+            if config.debug_all or config.debug_timeoutException:
+                return func(*args, **kwargs)
 
-            tt = time.time()
             while 1:
                 try:
-                    return func(self, *args, **kwargs)
+                    return func(*args, **kwargs)
                 except TimeoutException as e:
                     # when slow loading elements
-                    if debug_verbose > 0:
+                    if config.debug_verbose >= 1:
                         print(f'[{desc}]: caught TimeoutException')
 
                     if print_traceback:
                         exc_info = sys.exc_info()
                         traceback.print_exception(*exc_info)
 
-                    if callable(call_on_exception):
-                        call_on_exception()
+                    if callable(to_call):
+                        if to_call():
+                            return e
 
-                    if time.time() - tt > timer:
-                        print('>!> raising TimeoutException:', func, args, kwargs)
-                        raise e
+                    if return_on_exception:
+                        return e
                 except Exception as e:
                     if print_traceback:
                         exc_info = sys.exc_info()
                         traceback.print_exception(*exc_info)
                     raise e
-                print('>!> refresh on timeoutException')
-                self.refresh()
-                time.sleep(5)
+
+                time.sleep(sleep)
+
+        return wrapper
+
+    return decorator
+
+
+def call_if_exception(to_call: Callable, exception=Exception,
+                      desc: str = None, print_traceback: bool = False,
+                      return_on_exception: bool = False, sleep: int = 0):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            if config.debug_verbose >= 2 and desc is not None:
+                print(f'[{desc}]: [{args}, {kwargs}]')
+
+            if config.debug_all:
+                return func(*args, **kwargs)
+
+            while 1:
+                try:
+                    return func(*args, **kwargs)
+                except exception as e:
+                    if config.debug_verbose >= 1:
+                        print(f'[{desc}]: caught {repr(e)}')
+
+                    if print_traceback:
+                        exc_info = sys.exc_info()
+                        traceback.print_exception(*exc_info)
+
+                    if to_call():
+                        return e
+
+                    if return_on_exception:
+                        return e
+
+                    time.sleep(sleep)
+
+        return wrapper
+
+    return decorator
+
+
+def close_popup(selector: Union[Selector, List[Selector]], desc: str = None,
+                before: bool = False, after: bool = False, on_error: bool = False):
+    if isinstance(selector, Selector):
+        selector = [selector]
+
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            browser: Browser = self.browser
+
+            if config.debug_verbose >= 2 and desc is not None:
+                print(f'[{desc}]: [{self}, {args}, {kwargs}]')
+
+            def do():
+                for i in selector:
+                    if browser.is_on_page(i):
+                        browser.click(i, sleep=2.0)
+                        if config.debug_verbose >= 1:
+                            print(f'[{desc}]: closed popup: {i.desc}')
+
+            if before:
+                do()
+
+            n = 0
+            while 1:
+                n += 1
+                try:
+                    answer = func(self, *args, **kwargs)
+                    break
+                except (NoSuchElementException, ElementClickInterceptedException):
+                    if config.debug_verbose >= 1:
+                        print(f'[{desc}]: caught Exception')
+                    if n >= 3:
+                        raise
+                    if on_error:
+                        do()
+
+            if after:
+                do()
+
+            return answer
 
         return wrapper
 
