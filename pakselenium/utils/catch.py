@@ -115,7 +115,7 @@ def call_if_exception(to_call: Callable, exception=Exception,
                         exc_info = sys.exc_info()
                         traceback.print_exception(*exc_info)
 
-                    if to_call():
+                    if to_call(*args, **kwargs):
                         return e
 
                     if return_on_exception:
