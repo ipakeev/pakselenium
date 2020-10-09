@@ -132,12 +132,13 @@ class Browser(object):
             pass
 
     def is_on_page(self, selector: Selector, desc: str = None) -> bool:
+        log(f'[is_on_page]: {desc}: {selector.desc}' if desc else None, end=' ... ')
         try:
             self.driver.find_element(selector.by, selector.value)
-            log(f'[is_on_page:True]: {desc}: {selector.desc}' if desc else None)
+            log(f'[True]' if desc else None)
             return True
         except NoSuchElementException:
-            log(f'[is_on_page:False]: {desc}: {selector.desc}' if desc else None)
+            log(f'[False]' if desc else None)
             return False
 
     @catch.staleElementReferenceException()
@@ -290,6 +291,7 @@ class Browser(object):
 
     def wait_until(self, func: Union[Callable, List[Callable]], forever: bool = False, desc: str = None,
                    timeout: int = 20):
+        log(f'[wait_until]: {desc}' if desc else None, end=' ... ')
         self.driver_wait._timeout = timeout
 
         if type(func) is list:
@@ -299,7 +301,6 @@ class Browser(object):
 
         while 1:
             try:
-                log(f'[wait_until]: {desc}' if desc else None)
                 self.driver_wait.until(until)
                 break
             except TimeoutException as e:
@@ -308,9 +309,11 @@ class Browser(object):
                     raise e
 
         self.driver_wait._timeout = self.settings.timeout_wait
+        log(f'done' if desc else None)
 
     def wait_until_not(self, func: Union[Callable, List[Callable]], forever: bool = False, desc: str = None,
                        timeout: int = 20):
+        log(f'[wait_until_not]: {desc}' if desc else None, end=' ... ')
         self.driver_wait._timeout = timeout
 
         if type(func) is list:
@@ -320,7 +323,6 @@ class Browser(object):
 
         while 1:
             try:
-                log(f'[wait_until]: {desc}' if desc else None)
                 self.driver_wait.until(until)
                 break
             except TimeoutException as e:
@@ -329,6 +331,7 @@ class Browser(object):
                     raise e
 
         self.driver_wait._timeout = self.settings.timeout_wait
+        log(f'done' if desc else None)
 
     def _get_callable_until(self, until: Union[Selector, List[Selector],
                                                Callable, List[Callable]]) -> Union[Callable, List[Callable]]:
@@ -424,6 +427,7 @@ class Browser(object):
             if time.time() - tt >= timeout:
                 return False
             time.sleep(0.5)
+        log(f'[is_reached_page]: done' if desc else None)
 
     def go(self, url: str,
            until: Union[Selector, List[Selector], Callable, List[Callable]] = None,
@@ -444,28 +448,7 @@ class Browser(object):
             else:
                 log(f'[go:refresh:"{url}"]: {desc}' if desc else None)
                 self.driver.refresh()
-
-    @catch.timeoutException()
-    def go_and_catch_timeout_exception(self, url: str,
-                                       until: Union[Selector, List[Selector], Callable, List[Callable]] = None,
-                                       until_lost: Union[Selector, List[Selector]] = None,
-                                       empty: Callable = None, reload: Callable = None, is_reached_url: Callable = None,
-                                       sleep: float = 1.0,
-                                       desc: str = None, timeout: int = 20):
-        self.settings.url = url
-        while 1:
-            log(f'[go:"{url}"]: {desc}' if desc else None)
-            self.driver.get(url)
-            time.sleep(sleep)
-
-            if callable(is_reached_url):
-                self.wait_until(partial(is_reached_url(url), self.driver), timeout=timeout)
-
-            if self.is_reached_page(until, until_lost, empty, reload, timeout=timeout):
-                break
-            else:
-                log(f'[go:refresh:"{url}"]: {desc}' if desc else None)
-                self.driver.refresh()
+        log(f'[go]: done' if desc else None)
 
     def click(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
               until: Union[Selector, List[Selector], Callable, List[Callable]] = None,
@@ -480,34 +463,18 @@ class Browser(object):
         time.sleep(sleep)
 
         self.wait_until(lambda: self.is_reached_page(until, until_lost, empty, reload),
-                        desc=f'[click waiting...]', timeout=timeout)
-
-    @catch.timeoutException()
-    def click_and_catch_timeout_exception(self, selector: Union[Selector, PageElement],
-                                          element_text: str = None, element_index: int = None,
-                                          until: Union[Selector, List[Selector], Callable, List[Callable]] = None,
-                                          until_lost: Union[Selector, List[Selector]] = None,
-                                          empty: Callable = None, reload: Callable = None,
-                                          sleep: float = 0.5, desc: str = None, timeout: int = 20):
-        log(f'[click:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None)
-        if isinstance(selector, Selector):
-            self.wait_until_selector(EC.element_to_be_clickable, selector, timeout=timeout)
-        pe = self.get_page_element(selector, element_text=element_text, element_index=element_index)
-        pe.element.click()
-        time.sleep(sleep)
-
-        self.wait_until(lambda: self.is_reached_page(until, until_lost, empty, reload),
-                        desc=f'[click waiting...]', timeout=timeout)
+                        desc=f'[click waiting]', timeout=timeout)
 
     def refresh(self, until: Union[Selector, List[Selector], Callable, List[Callable]] = None, sleep: float = 5.0,
                 desc: str = None):
-        log(f'[refresh]: {desc}' if desc else None)
+        log(f'[refresh]: {desc}' if desc else None, end=' ... ')
         until = self._get_callable_until(until)
         while 1:
             self.driver.refresh()
             time.sleep(sleep)
             if CC.is_reached(until):
                 break
+        log(f'done' if desc else None)
 
     @property
     def current_url(self) -> str:
@@ -527,7 +494,7 @@ class Browser(object):
     @catch.staleElementReferenceException()
     def select(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
                sleep: float = 0.5, desc: str = None):
-        log(f'[select:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None)
+        log(f'[select:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None, end=' ... ')
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_text=element_text, element_index=element_index)
@@ -535,11 +502,12 @@ class Browser(object):
         pe.element.click()
         self.wait_until_page_element(EC.is_selected, pe)
         time.sleep(sleep)
+        log(f'done' if desc else None)
 
     @catch.staleElementReferenceException()
     def deselect(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
                  sleep: float = 0.5, desc: str = None):
-        log(f'[deselect:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None)
+        log(f'[deselect:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None, end=' ... ')
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_text=element_text, element_index=element_index)
@@ -547,10 +515,11 @@ class Browser(object):
         pe.element.click()
         self.wait_until_not_page_element(EC.is_selected, pe)
         time.sleep(sleep)
+        log(f'done' if desc else None)
 
     def fill_text(self, selector: Union[Selector, PageElement], text: str, element_index: int = None,
                   clear: bool = True, quick: bool = False, sleep: float = 0.5, desc: str = None):
-        log(f'[fill_text:{selector}={text}]: {desc}' if desc else None)
+        log(f'[fill_text:{selector}={text}]: {desc}' if desc else None, end=' ... ')
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_index=element_index)
@@ -565,10 +534,11 @@ class Browser(object):
                 time.sleep(np.random.random() / 10)
 
         time.sleep(sleep)
+        log(f'done' if desc else None)
 
     def fill_text_one_by_one(self, selector: Selector, texts: List[str], check_length: bool = True,
                              quick: bool = False, sleep: float = 0.5, desc: str = None):
-        log(f'[fill_text_one_by_one:{selector}={texts}]: {desc}' if desc else None)
+        log(f'[fill_text_one_by_one:{selector}={texts}]: {desc}' if desc else None, end=' ... ')
         self.wait_until_selector(EC.element_to_be_clickable, selector)
         pes = self.find_elements(selector)
         if check_length:
@@ -581,10 +551,11 @@ class Browser(object):
                 time.sleep(np.random.random() / 5)
 
         time.sleep(sleep)
+        log(f'done' if desc else None)
 
     def move_cursor(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
                     sleep: float = 0.5, desc: str = None):
-        log(f'[move_cursor:{selector}]: {desc}' if desc else None)
+        log(f'[move_cursor:{selector}]: {desc}' if desc else None, end=' ... ')
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector)
         pe = self.get_page_element(selector, element_text=element_text, element_index=element_index)
@@ -592,12 +563,13 @@ class Browser(object):
         self.driver_actions.move_to_element(pe.element)
         self.driver_actions.perform()
         time.sleep(sleep)
+        log(f'done' if desc else None)
 
     def drug_and_drop(self, source: Union[Selector, PageElement], target: Union[Selector, PageElement],
                       source_text: str = None, target_text: str = None,
                       source_index: int = None, target_index: int = None,
                       sleep: float = 0.5, desc: str = None):
-        log(f'[drug_and_drop:{source}->{target}]: {desc}' if desc else None)
+        log(f'[drug_and_drop:{source}->{target}]: {desc}' if desc else None, end=' ... ')
         if isinstance(source, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, source)
         if isinstance(target, Selector):
@@ -607,24 +579,30 @@ class Browser(object):
         self.driver_actions.reset_actions()
         self.driver_actions.drag_and_drop(source, target).perform()
         time.sleep(sleep)
+        log(f'done' if desc else None)
 
     def press_key(self, key, desc: str = None):
-        log(f'[press_key:{key}]: {desc}' if desc else None)
+        log(f'[press_key:{key}]: {desc}' if desc else None, end=' ... ')
         self.driver_actions.reset_actions()
         self.driver_actions.key_down(key).key_up(key).perform()
+        log(f'done' if desc else None)
 
     def press_Enter(self, desc: str = None):
-        log(f'[press_Enter]: {desc}' if desc else None)
+        log(f'[press_Enter]: {desc}' if desc else None, end=' ... ')
         self.press_key(Keys.ENTER)
+        log(f'done' if desc else None)
 
     def press_Backspace(self, desc: str = None):
-        log(f'[press_Backspace]: {desc}' if desc else None)
+        log(f'[press_Backspace]: {desc}' if desc else None, end=' ... ')
         self.press_key(Keys.BACKSPACE)
+        log(f'done' if desc else None)
 
     def press_Tab(self, desc: str = None):
-        log(f'[press_Tab]: {desc}' if desc else None)
+        log(f'[press_Tab]: {desc}' if desc else None, end=' ... ')
         self.press_key(Keys.TAB)
+        log(f'done' if desc else None)
 
     def press_Esc(self, desc: str = None):
-        log(f'[press_Esc]: {desc}' if desc else None)
+        log(f'[press_Esc]: {desc}' if desc else None, end=' ... ')
         self.press_key(Keys.ESCAPE)
+        log(f'done' if desc else None)
