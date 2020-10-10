@@ -443,7 +443,7 @@ class Browser(object):
             if callable(is_reached_url):
                 self.wait_until(partial(is_reached_url(url), self.driver), timeout=timeout)
 
-            if self.is_reached_page(until, until_lost, empty, reload, desc=f'[go waiting...]', timeout=timeout):
+            if self.is_reached_page(until, until_lost, empty, reload, desc=f'[go:waiting]', timeout=timeout):
                 break
             else:
                 log(f'[go:refresh:"{url}"]: {desc}' if desc else None)
@@ -463,7 +463,7 @@ class Browser(object):
         time.sleep(sleep)
 
         self.wait_until(lambda: self.is_reached_page(until, until_lost, empty, reload),
-                        desc=f'[click waiting]', timeout=timeout)
+                        desc=f'[click:waiting]', timeout=timeout)
 
     def refresh(self, until: Union[Selector, List[Selector], Callable, List[Callable]] = None, sleep: float = 5.0,
                 desc: str = None):

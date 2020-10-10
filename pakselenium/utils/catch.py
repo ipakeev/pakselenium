@@ -11,7 +11,7 @@ from pakselenium import config
 
 def staleElementReferenceException(to_call: Callable = None,
                                    desc: str = None, print_traceback: bool = False,
-                                   return_on_exception: bool = False, sleep: int = 0):
+                                   return_on_exception: bool = False, sleep: int = 1):
     def decorator(func):
         def wrapper(*args, **kwargs):
             if config.debug_verbose >= 2 and desc is not None:
@@ -53,7 +53,7 @@ def staleElementReferenceException(to_call: Callable = None,
 
 def timeoutException(to_call: Callable = None,
                      desc: str = None, print_traceback: bool = False,
-                     return_on_exception: bool = False, sleep: int = 0):
+                     return_on_exception: bool = False, sleep: int = 1):
     def decorator(func):
         def wrapper(*args, **kwargs):
             if config.debug_verbose >= 2 and desc is not None:
@@ -95,7 +95,7 @@ def timeoutException(to_call: Callable = None,
 
 def call_if_exception(to_call: Callable, exception=Exception,
                       desc: str = None, print_traceback: bool = False,
-                      return_on_exception: bool = False, sleep: int = 0):
+                      return_on_exception: bool = False, sleep: int = 1):
     def decorator(func):
         def wrapper(*args, **kwargs):
             if config.debug_verbose >= 2 and desc is not None:
