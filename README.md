@@ -4,13 +4,14 @@
 ```python
 from pakselenium import Browser, Selector, By, catch, config
 
+# must be 0, 1 or 2
 config.debug_verbose = 1
 
 browser = Browser()
 browser.init_chrome(chrome_driver_path)
 browser.driver.set_window_size(640, 480)
 
-# to wait until this selector is not on page
+# wait until this selector is on the page
 until = Selector(By.CSS_SELECTOR, '.input')
 
 @catch.timeoutException(lambda: browser.refresh())
