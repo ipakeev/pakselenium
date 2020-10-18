@@ -1,5 +1,7 @@
 # pakselenium
 
+## Usage
+```python
 from pakselenium import Browser, Selector, By, catch, config
 
 config.debug_verbose = 1
@@ -13,3 +15,4 @@ def go_to_google():
 	browser.go('https://google.com', until=Selector(By.CSS_SELECTOR, '.input'), sleep=5.0, desc='google', timeout=10)
 	
 go_to_google()
+```
