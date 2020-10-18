@@ -35,7 +35,5 @@ until = [Selector(By.CSS_SELECTOR, '.input'), Selector(By.CSS_SELECTOR, '.phlogo
 until = lambda: browser.is_on_page(Selector(By.CSS_SELECTOR, '.input'))
 
 def until():
-	if browser.is_on_page(Selector(By.CSS_SELECTOR, '.input')) and browser.is_on_page(Selector(By.CSS_SELECTOR, '.phlogo')):
-		return True
-	return False
+	return browser.is_on_page(Selector(By.CSS_SELECTOR, '.input')) and browser.is_on_page(Selector(By.CSS_SELECTOR, '.phlogo')):
 ```
