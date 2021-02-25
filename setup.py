@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pakselenium',
-    version='0.4.7',
+    version='0.4.8',
     packages=find_packages(),
     url='https://github.com/ipakeev',
     license='MIT',

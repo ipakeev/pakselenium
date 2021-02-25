@@ -238,7 +238,7 @@ class Browser(object):
         return lambda: not self.is_on_page(selector, desc=desc)
 
     def wait_until_on_page(self, selector: Union[Selector, List[Selector]],
-                           forever: bool = False, desc: str = None, timeout: int = 20):
+                           forever: bool = False, desc: str = None, timeout: int = None):
         if isinstance(selector, Selector):
             func = self.get_is_on_page_callable(selector, desc=desc)
         else:
@@ -246,7 +246,7 @@ class Browser(object):
         self.wait_until(func, forever=forever, timeout=timeout)
 
     def wait_until_not_on_page(self, selector: Union[Selector, List[Selector]],
-                               forever: bool = False, desc: str = None, timeout: int = 20):
+                               forever: bool = False, desc: str = None, timeout: int = None):
         if isinstance(selector, Selector):
             func = self.get_is_not_on_page_callable(selector, desc=desc)
         else:
@@ -255,7 +255,7 @@ class Browser(object):
 
     def wait_until_selector(self, EC_condition: Callable,
                             selector: Union[Selector, List[Selector]], *args,
-                            forever: bool = False, desc: str = None, timeout: int = 20, **kwargs):
+                            forever: bool = False, desc: str = None, timeout: int = None, **kwargs):
         if isinstance(selector, Selector):
             func = partial(EC_condition(selector.locator, *args, **kwargs), self.driver)
         else:
@@ -264,7 +264,7 @@ class Browser(object):
 
     def wait_until_not_selector(self, EC_condition: Callable,
                                 selector: Union[Selector, List[Selector]], *args,
-                                forever: bool = False, desc: str = None, timeout: int = 20, **kwargs):
+                                forever: bool = False, desc: str = None, timeout: int = None, **kwargs):
         if isinstance(selector, Selector):
             func = partial(EC_condition(selector.locator, *args, **kwargs), self.driver)
         else:
@@ -273,7 +273,7 @@ class Browser(object):
 
     def wait_until_page_element(self, EC_condition: Callable,
                                 pe: Union[PageElement, List[PageElement]], *args,
-                                forever: bool = False, desc: str = None, timeout: int = 20, **kwargs):
+                                forever: bool = False, desc: str = None, timeout: int = None, **kwargs):
         if isinstance(pe, PageElement):
             func = partial(EC_condition(pe.element, *args, **kwargs), self.driver)
         else:
@@ -282,7 +282,7 @@ class Browser(object):
 
     def wait_until_not_page_element(self, EC_condition: Callable,
                                     pe: Union[PageElement, List[PageElement]], *args,
-                                    forever: bool = False, desc: str = None, timeout: int = 20, **kwargs):
+                                    forever: bool = False, desc: str = None, timeout: int = None, **kwargs):
         if isinstance(pe, PageElement):
             func = partial(EC_condition(pe.element, *args, **kwargs), self.driver)
         else:
@@ -290,9 +290,10 @@ class Browser(object):
         self.wait_until_not(func, forever=forever, desc=desc, timeout=timeout)
 
     def wait_until(self, func: Union[Callable, List[Callable]], forever: bool = False, desc: str = None,
-                   timeout: int = 20):
+                   timeout: int = None):
         log(f'[wait_until]: {desc}' if desc else None, end=' ... ')
-        self.driver_wait._timeout = timeout
+        if timeout is not None:
+            self.driver_wait._timeout = timeout
 
         if type(func) is list:
             until = lambda driver: all([i() for i in func])
@@ -312,9 +313,10 @@ class Browser(object):
         log(f'done' if desc else None)
 
     def wait_until_not(self, func: Union[Callable, List[Callable]], forever: bool = False, desc: str = None,
-                       timeout: int = 20):
+                       timeout: int = None):
         log(f'[wait_until_not]: {desc}' if desc else None, end=' ... ')
-        self.driver_wait._timeout = timeout
+        if timeout is not None:
+            self.driver_wait._timeout = timeout
 
         if type(func) is list:
             until = lambda driver: all([not i() for i in func])
@@ -410,7 +412,7 @@ class Browser(object):
 
     def is_reached_page(self, until: Union[Selector, List[Selector], Callable, List[Callable]],
                         until_lost: Union[Selector, List[Selector]], empty: Callable, reload: Callable,
-                        desc: str = None, timeout: int = 20) -> bool:
+                        desc: str = None, timeout: int = None) -> bool:
         until = self._get_callable_until(until)
         until_lost = self._get_callable_until_lost(until_lost)
         tt = time.time()
@@ -433,7 +435,7 @@ class Browser(object):
            until: Union[Selector, List[Selector], Callable, List[Callable]] = None,
            until_lost: Union[Selector, List[Selector]] = None,
            empty: Callable = None, reload: Callable = None, is_reached_url: Callable = None, sleep: float = 1.0,
-           desc: str = None, timeout: int = 20):
+           desc: str = None, timeout: int = None):
         self.settings.url = url
         while 1:
             log(f'[go:"{url}"]: {desc}' if desc else None)
@@ -454,7 +456,7 @@ class Browser(object):
               until: Union[Selector, List[Selector], Callable, List[Callable]] = None,
               until_lost: Union[Selector, List[Selector]] = None,
               empty: Callable = None, reload: Callable = None,
-              sleep: float = 0.5, desc: str = None, timeout: int = 20):
+              sleep: float = 0.5, desc: str = None, timeout: int = None):
         log(f'[click:{selector}[{element_text}, {element_index}]]: {desc}' if desc else None)
         if isinstance(selector, Selector):
             self.wait_until_selector(EC.element_to_be_clickable, selector, timeout=timeout)
