@@ -1,14 +1,17 @@
+import random
 import time
+from dataclasses import dataclass
+from enum import Enum
 from functools import partial
 from typing import List, Callable, Union, Tuple, Optional
 
-import numpy as np
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import WebDriverException
-from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver import ChromeOptions
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.remote.webelement import WebElement
@@ -56,15 +59,19 @@ class PageElement(object):
         return self.element.get_attribute(name)
 
 
+class Names(Enum):
+    chrome = 'chrome'
+    firefox = 'firefox'
+    phantomJS = 'phantomJS'
+
+
+@dataclass
 class Settings(object):
-    driver_name: str
-    driver_kwargs: dict
+    driver_name: str = None
+    driver_kwargs: dict = None
     timeout_wait: int = 20
     implicit_wait: int = 0
     url: str = ''
-    chrome: str = 'chrome'
-    firefox: str = 'firefox'
-    phantomJS: str = 'phantomJS'
 
 
 def log(msg: Optional[str], min_verbose: int = 2, end=None):
@@ -76,35 +83,51 @@ class Browser(object):
     driver: webdriver.Chrome
     driver_wait: WebDriverWait
     driver_actions: ActionChains
-    settings: Settings
+    wait_page_loading: bool = True
+    stop_page_loading: Callable
 
-    def __init__(self, settings: Settings = None):
-        self.settings = settings or Settings()
+    def __init__(self):
+        self.settings = Settings()
 
-    def init_chrome(self, driver_path: str, options: ChromeOptions = None):
-        self.settings.driver_name = self.settings.chrome
-        self.settings.driver_kwargs = {
-            'driver_path': driver_path,
-            'options': options,
-        }
-        self.driver = webdriver.Chrome(executable_path=driver_path, options=options)
+    def init_chrome(self,
+                    driver_path: str,
+                    options: ChromeOptions = None,
+                    wait_page_loading=True,
+                    **kwargs):
+        self.settings.driver_name = Names.chrome.value
+        self.settings.driver_kwargs = dict(driver_path=driver_path, options=options,
+                                           wait_page_loading=wait_page_loading, **kwargs)
+        self.wait_page_loading = wait_page_loading
+        self.stop_page_loading = lambda: self.driver.execute_script("window.stop();")
+        if not wait_page_loading:
+            capa = DesiredCapabilities.CHROME
+            capa['pageLoadStrategy'] = 'none'
+        else:
+            capa = None
+
+        self.driver = webdriver.Chrome(executable_path=driver_path,
+                                       options=options,
+                                       desired_capabilities=capa,
+                                       **kwargs)
         self.init_after_browser()
 
-    def init_firefox(self, driver_path: str, binary_path: str):
-        self.settings.driver_name = self.settings.firefox
-        self.settings.driver_kwargs = {
-            'driver_path': driver_path,
-            'binary_path': binary_path,
-        }
-        self.driver = webdriver.Firefox(executable_path=driver_path, firefox_binary=FirefoxBinary(binary_path))
+    def init_firefox(self,
+                     driver_path: str,
+                     binary_path: str,
+                     **kwargs):
+        self.settings.driver_name = Names.firefox.value
+        self.settings.driver_kwargs = dict(driver_path=driver_path, binary_path=binary_path, **kwargs)
+        self.driver = webdriver.Firefox(executable_path=driver_path,
+                                        firefox_binary=FirefoxBinary(binary_path),
+                                        **kwargs)
         self.init_after_browser()
 
-    def init_phantomJS(self, driver_path: str):
-        self.settings.driver_name = self.settings.phantomJS
-        self.settings.driver_kwargs = {
-            'driver_path': driver_path,
-        }
-        self.driver = webdriver.PhantomJS(executable_path=driver_path)
+    def init_phantomJS(self,
+                       driver_path: str,
+                       **kwargs):
+        self.settings.driver_name = Names.phantomJS.value
+        self.settings.driver_kwargs = dict(driver_path=driver_path, **kwargs)
+        self.driver = webdriver.PhantomJS(executable_path=driver_path, **kwargs)
         self.init_after_browser()
 
     def init_after_browser(self):
@@ -116,11 +139,11 @@ class Browser(object):
     def new_session(self):
         assert self.settings.driver_name
         self.close()
-        if self.settings.driver_name == self.settings.chrome:
+        if self.settings.driver_name == Names.chrome.value:
             self.init_chrome(**self.settings.driver_kwargs)
-        elif self.settings.driver_name == self.settings.firefox:
+        elif self.settings.driver_name == Names.firefox.value:
             self.init_firefox(**self.settings.driver_kwargs)
-        elif self.settings.driver_name == self.settings.phantomJS:
+        elif self.settings.driver_name == Names.phantomJS.value:
             self.init_phantomJS(**self.settings.driver_kwargs)
         else:
             raise StopIteration(self.settings.driver_name)
@@ -422,6 +445,8 @@ class Browser(object):
             if CC.is_empty(empty):
                 return True
             if CC.is_reload(reload):
+                if not self.wait_page_loading:
+                    self.stop_page_loading()
                 self.driver.refresh()
                 continue
             if CC.is_reached(until) and CC.is_reached(until_lost):
@@ -446,10 +471,20 @@ class Browser(object):
                 self.wait_until(partial(is_reached_url(url), self.driver), timeout=timeout)
 
             if self.is_reached_page(until, until_lost, empty, reload, desc=f'[go:waiting]', timeout=timeout):
+                if not self.wait_page_loading:
+                    self.stop_page_loading()
                 break
             else:
+                if not self.wait_page_loading:
+                    self.stop_page_loading()
                 log(f'[go:refresh:"{url}"]: {desc}' if desc else None)
                 self.driver.refresh()
+                time.sleep(sleep)
+                if not self.wait_page_loading:
+                    self.stop_page_loading()
+
+        if not self.wait_page_loading:
+            self.stop_page_loading()
         log(f'[go]: done' if desc else None)
 
     def click(self, selector: Union[Selector, PageElement], element_text: str = None, element_index: int = None,
@@ -466,6 +501,8 @@ class Browser(object):
 
         self.wait_until(lambda: self.is_reached_page(until, until_lost, empty, reload),
                         desc=f'[click:waiting]', timeout=timeout)
+        if not self.wait_page_loading:
+            self.stop_page_loading()
 
     def refresh(self, until: Union[Selector, List[Selector], Callable, List[Callable]] = None, sleep: float = 5.0,
                 desc: str = None):
@@ -476,6 +513,11 @@ class Browser(object):
             time.sleep(sleep)
             if CC.is_reached(until):
                 break
+            if not self.wait_page_loading:
+                self.stop_page_loading()
+
+        if not self.wait_page_loading:
+            self.stop_page_loading()
         log(f'done' if desc else None)
 
     @property
@@ -533,7 +575,7 @@ class Browser(object):
         else:
             for s in text:
                 pe.element.send_keys(s)
-                time.sleep(np.random.random() / 10)
+                time.sleep(random.random() / 10)
 
         time.sleep(sleep)
         log(f'done' if desc else None)
@@ -550,7 +592,7 @@ class Browser(object):
             pe.element.clear()
             pe.element.send_keys(text)
             if not quick:
-                time.sleep(np.random.random() / 5)
+                time.sleep(random.random() / 5)
 
         time.sleep(sleep)
         log(f'done' if desc else None)
